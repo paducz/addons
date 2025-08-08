@@ -67,17 +67,18 @@ def main():
         duck_duration = duck_end_pos - duck_start_pos
         
         print(f"Vytvářím ztlumenou 'záplatu' o délce {duck_duration / 1000:.2f}s.")
-        ducked_segment = final_background[duck_start_pos:duck_end_pos]
+        # Vezmeme odpovídající kousek z původní hlasité hudby
+        ducked_segment_original = final_background[duck_start_pos:duck_end_pos]
         
-        # Aplikujeme plynulé přechody na okrajích této záplaty
-        ducked_segment = ducked_segment.fade_in(TRANSITION_FADE_MS).fade_out(TRANSITION_FADE_MS)
-        
-        # Ztlumíme celou záplatu
-        ducked_segment = ducked_segment.apply_gain(DUCKING_DB)
+        # Nyní tuto záplatu ztlumíme a na její okraje aplikujeme plynulé přechody
+        ducked_segment_processed = ducked_segment_original.apply_gain(DUCKING_DB)
+        ducked_segment_processed = ducked_segment_processed.fade_in(TRANSITION_FADE_MS)
+        ducked_segment_processed = ducked_segment_processed.fade_out(TRANSITION_FADE_MS)
+
 
         # --- Aplikace ztlumené záplaty na hlavní hudební stopu ---
         print(f"Aplikuji ztlumenou záplatu na hudební plátno na pozici {duck_start_pos}ms.")
-        final_background = final_background.overlay(ducked_segment, position=duck_start_pos)
+        final_background = final_background.overlay(ducked_segment_processed, position=duck_start_pos)
         
         # --- Příprava hlasové stopy s tichem na začátku ---
         print(f"Vytvářím hlasovou stopu s {INTRO_DURATION_MS}ms ticha na začátku...")
