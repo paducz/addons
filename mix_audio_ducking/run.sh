@@ -18,14 +18,15 @@ MUSIC_FILENAME=$(echo "$CONFIG" | jq -r '.music_filename')
 TEXT_TO_SPEAK=$(echo "$CONFIG" | jq -r '.text_to_speak')
 OUTPUT_FILENAME=$(echo "$CONFIG" | jq -r '.output_filename')
 
-bashio::log.info "Cílový výstupní soubor: /share/${OUTPUT_FILENAME}"
+bashio::log.info "Cílový výstupní soubor: '${OUTPUT_FILENAME}'" # Změna logu
 bashio::log.info "Hudební soubor: '${MUSIC_FILENAME}'"
 bashio::log.info "Text k přečtení: '${TEXT_TO_SPEAK}'"
 
 # --- 2. Definice cest k souborům ---
 MUSIC_PATH="${MUSIC_FILENAME}"
+# Zde je klíčová změna: výstupní cesta je nyní plně flexibilní
+OUTPUT_PATH="${OUTPUT_FILENAME}"
 TTS_PATH="/tmp/tts.mp3"
-OUTPUT_PATH="/share/${OUTPUT_FILENAME}"
 INTRO_PATH="/tmp/intro.mp3"
 MAIN_MUSIC_PATH="/tmp/main_music.mp3"
 DUCKED_PART_PATH="/tmp/ducked_part.mp3"
@@ -44,30 +45,19 @@ if [ ! -f "$MUSIC_PATH" ]; then
 fi
 
 # --- 4. Generování TTS stopy ---
-# FINÁLNÍ OPRAVA: API vrací proud dat (generátor), který musíme zpracovat ve smyčce.
 bashio::log.info "Generuji řečovou stopu pomocí ElevenLabs..."
 cat << EOF > /tmp/generate_tts.py
 from elevenlabs.client import ElevenLabs
-
-# Inicializace klienta
-client = ElevenLabs(
-    api_key="${ELEVENLABS_API_KEY}",
-)
-
-# Vygenerování proudu audio dat (generátoru)
+client = ElevenLabs(api_key="${ELEVENLABS_API_KEY}")
 audio_stream = client.text_to_speech.convert(
     voice_id="${VOICE_ID}",
     text="""${TEXT_TO_SPEAK}""",
     model_id="eleven_multilingual_v2"
 )
-
-# Zápis proudu dat do souboru kousek po kousku
 with open("${TTS_PATH}", "wb") as f:
     for chunk in audio_stream:
         f.write(chunk)
-
 EOF
-
 python3 /tmp/generate_tts.py
 if [ ! -f "$TTS_PATH" ]; then
     bashio::log.fatal "Generování TTS selhalo. Zkontrolujte API klíč, ID hlasu a připojení k internetu."
@@ -77,6 +67,7 @@ fi
 # --- 5. Zpracování zvuku pomocí FFMPEG ---
 TTS_DURATION=$(ffprobe -i "$TTS_PATH" -show_entries format=duration -v quiet -of csv="p=0")
 bashio::log.info "Délka řečové stopy: ${TTS_DURATION}s."
+# ... (všechny ffmpeg příkazy zůstávají stejné)
 bashio::log.info "Vytvářím 1s intro..."
 ffmpeg -y -i "$MUSIC_PATH" -t 1 -c:a copy "$INTRO_PATH" > /dev/null 2>&1
 bashio::log.info "Připravuji hudební segment pro ducking..."
@@ -98,7 +89,8 @@ ffmpeg -y -i "$FINAL_UNFADED_PATH" -af "afade=t=out:st=${FADEOUT_START_TIME}:d=1
 
 # --- 6. Závěr ---
 if [ -f "$OUTPUT_PATH" ]; then
-    bashio::log.info "Hotovo! Finální soubor byl uložen do /share/${OUTPUT_FILENAME}"
+    # Změna logu pro správnou cestu
+    bashio::log.info "Hotovo! Finální soubor byl uložen do '${OUTPUT_PATH}'"
 else
     bashio::log.error "Nepodařilo se vytvořit finální soubor."
     exit 1
