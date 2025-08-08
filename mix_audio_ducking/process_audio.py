@@ -17,10 +17,10 @@ from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
 # === CONFIG =================================================================
-INTRO_FULL_MS   = 4_000      # 4 s full intro
-DUCK_FADE_MS    =  1000      # nominal fade length; may shrink if TTS is very short
+INTRO_FULL_MS   = 5_000      # 4 s full intro
+DUCK_FADE_MS    =  1200      # nominal fade length; may shrink if TTS is very short
 DUCK_LEVEL_DB   =  -19       # duck amount during TTS
-OUTRO_FULL_MS   = 4_000      # 3 s full at the end
+OUTRO_FULL_MS   = 5_000      # 3 s full at the end
 FINAL_FADE_MS   = 2_000      # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
