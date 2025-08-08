@@ -9,7 +9,7 @@ arch:
   - armhf
   - armv7
   - i386
-startup: "service"
+startup: "services"
 init: false
 map:
   - share:rw
