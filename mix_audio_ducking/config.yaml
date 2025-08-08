@@ -6,7 +6,7 @@ description: >
 arch:
   - amd64
   - armv7
-  - arm64
+  - aarch64
 startup: services
 boot: auto
 host_network: false
