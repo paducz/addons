@@ -1,7 +1,7 @@
-# https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
-name: "Audio Mixer with Pydub"
-description: "Generates TTS and mixes it with music using Pydub. Output is saved to /media."
-version: "5.0.0" # Nová architektura, nová hlavní verze
+# config.yaml
+name: "Audio Mixer Service"
+description: "A persistent service that listens for requests to generate audio files."
+version: "6.0.0" # A new architecture deserves a new major version
 slug: "mix_audio_ducking"
 arch:
   - aarch64
@@ -9,8 +9,12 @@ arch:
   - armhf
   - armv7
   - i386
-startup: "application"
+# This is the key change: we tell HA this is a long-running service
+startup: "services"
 init: false
+# We also need to add the 'watchdog' to ensure it keeps running
+watchdog: "bashio::log.info 'Monitoring loop is active.'"
+
 audio: true
 map:
   - share:rw
