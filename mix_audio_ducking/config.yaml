@@ -1,0 +1,26 @@
+name: Mix Audio with Ducking
+version: "1.0.0"
+slug: mix_audio_ducking
+description: >
+  Generates TTS via ElevenLabs and mixes with background music including intro, ducking, outro and fade-out.
+arch:
+  - amd64
+  - armv7
+  - arm64
+startup: services
+boot: auto
+host_network: false
+ports:
+  8080/tcp: 8080
+map:
+  - share
+options:
+  audio_dir: /share/audio
+  port: 8080
+  auth_token: ""
+  eleven_key: ""
+schema:
+  audio_dir: "str?"
+  port: "int?"
+  auth_token: "str?"
+  eleven_key: "str"
