@@ -1,72 +1,63 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bash
 
 # ==============================================================================
 # = This script runs as a persistent service, listening for jobs on stdin.    =
+# = It uses standard 'echo' for logging as it is the main service process.   =
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# M A I N   S E R V I C E   L O O P
-#
-# This function contains the infinite loop that waits for jobs.
-# ------------------------------------------------------------------------------
-main_loop() {
-    bashio::log.info "-----------------------------------------------------------"
-    bashio::log.info "            Audio Mixer Service is now running"
-    bashio::log.info " This add-on is ready and waiting for JSON requests on stdin."
-    bashio::log.info "-----------------------------------------------------------"
+# --- Initial Startup Log ---
+echo "-----------------------------------------------------------"
+echo "            Audio Mixer Service has started"
+echo " This add-on is now running as a persistent service."
+echo " Waiting for JSON requests on stdin from Home Assistant..."
+echo "-----------------------------------------------------------"
 
-    while true; do
-        # The 'read' command is a blocking call. It will wait here until
-        # the hassio.addon_stdin service sends a line of data.
-        local line
-        read -r line
+# --- Main Service Loop ---
+while true; do
+    # 'read' is a blocking call. It waits here until data is piped.
+    read -r line
 
-        # Check if we actually received a non-empty line of data
-        if [[ -n "$line" ]]; then
-            bashio::log.info "================ NEW JOB RECEIVED ================"
-            
-            # Log the raw received data for debugging
-            bashio::log.debug "Raw JSON received: $line"
-
-            # Use default values from config and merge stdin data which takes precedence.
-            local api_key
-            local voice_id
-            local music_filename
-            local text_to_speak
-            local output_filename
-            
-            api_key=$(bashio::config 'elevenlabs_api_key')
-            voice_id=$(echo "$line" | jq -e -r ".voice_id // \"$(bashio::config 'voice_id')\"")
-            music_filename=$(echo "$line" | jq -e -r ".music_filename // \"$(bashio::config 'music_filename')\"")
-            text_to_speak=$(echo "$line" | jq -e -r '.text_to_speak // empty')
-            output_filename=$(echo "$line" | jq -e -r '.output_filename // empty')
+    # Check for non-empty data
+    if [ -n "$line" ]; then
+        echo "================ NEW JOB RECEIVED ================"
+        
+        # --- Safely parse the JSON data using jq ---
+        # Note: We can't use bashio::config, so we MUST pass the API key in the script call.
+        
+        # We need to make sure the input is valid JSON before proceeding
+        if ! echo "$line" | jq -e . >/dev/null; then
+            echo "Error: Received invalid JSON. Ignoring request."
+        else
+            # Extract values, providing 'null' as a default for optional fields
+            VOICE_ID=$(echo "$line" | jq -r '.voice_id // null')
+            MUSIC_FILENAME=$(echo "$line" | jq -r '.music_filename // null')
+            TEXT_TO_SPEAK=$(echo "$line" | jq -r '.text_to_speak // null')
+            OUTPUT_FILENAME=$(echo "$line" | jq -r '.output_filename // null')
+            API_KEY=$(echo "$line" | jq -r '.api_key // null')
 
             # --- Validate mandatory parameters ---
-            if ! bashio::config.has_value 'elevenlabs_api_key'; then
-                 bashio::log.error "Mandatory parameter 'elevenlabs_api_key' is not set in the configuration. Aborting job."
-            elif [[ -z "$text_to_speak" ]]; then
-                bashio::log.error "Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
-            elif [[ -z "$output_filename" ]]; then
-                bashio::log.error "Mandatory parameter 'output_filename' was not provided in the request. Aborting job."
+            if [[ "$API_KEY" == "null" ]]; then
+                 echo "Error: Mandatory parameter 'api_key' was not provided. Aborting job."
+            elif [[ "$TEXT_TO_SPEAK" == "null" ]]; then
+                echo "Error: Mandatory parameter 'text_to_speak' was not provided. Aborting job."
+            elif [[ "$OUTPUT_FILENAME" == "null" ]]; then
+                echo "Error: Mandatory parameter 'output_filename' was not provided. Aborting job."
             else
-                bashio::log.info "Job is valid. Starting Python audio processor..."
+                echo "Job is valid. Starting Python audio processor..."
                 # --- Call the Python script with the final, validated data ---
                 /process_audio.py \
-                    "$api_key" \
-                    "$voice_id" \
-                    "$music_filename" \
-                    "$text_to_speak" \
-                    "$output_filename"
+                    "$API_KEY" \
+                    "$VOICE_ID" \
+                    "$MUSIC_FILENAME" \
+                    "$TEXT_TO_SPEAK" \
+                    "$OUTPUT_FILENAME"
             fi
-            
-            bashio::log.info "=============== JOB-HANDLING FINISHED ==============="
         fi
         
-        # This sleep is a safety net.
-        sleep 1
-    done
-}
-
-# --- SCRIPT EXECUTION ---
-# This line calls the main loop function, starting the persistent service.
-main_loop
+        echo "=============== JOB-HANDLING FINISHED ==============="
+        echo "Waiting for next job..."
+    fi
+    
+    # Sleep to prevent high CPU usage in case of a fast-failing loop
+    sleep 1
+done
