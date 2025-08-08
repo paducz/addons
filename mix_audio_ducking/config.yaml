@@ -1,7 +1,7 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: "Audio Mixer with Pydub"
 description: "Generates TTS and mixes it with music using Pydub. Output is saved to /media."
-version: "4.0.0" # Nová architektura, nová hlavní verze
+version: "5.0.0" # Nová architektura, nová hlavní verze
 slug: "mix_audio_ducking"
 arch:
   - aarch64
