@@ -6,16 +6,16 @@ from elevenlabs.client import ElevenLabs
 
 # --- KONFIGURACE EFEKTŮ ---
 INTRO_STABLE_MS = 4000      # Délka úvodní hudby na plnou hlasitost
-OUTRO_STABLE_MS = 3000     # Délka závěrečné hudby na plnou hlasitost
-FADE_DURATION_MS = 500     # Délka přechodu pro fade in/out
-DUCKING_DB = -18           # O kolik decibelů ztlumit hudbu
-FADEOUT_DURATION_MS = 1000 # Finální zeslabení celého klipu
+OUTRO_STABLE_MS = 3000      # Délka závěrečné hudby na plnou hlasitost
+TRANSITION_FADE_MS = 500    # Délka přechodu (fade in/out) pro ducking
+FADEOUT_DURATION_MS = 1000    # Finální zeslabení celého klipu
+DUCKING_DB = -18              # O kolik decibelů ztlumit hudbu
 
 # Cesta k dočasnému souboru pro TTS
 TTS_TEMP_FILE = "/tmp/tts.mp3"
 
 def main():
-    # --- 1. Načtení argumentů ---
+    # --- 1. Načtení argumentů z run.sh ---
     if len(sys.argv) != 6:
         print(f"Chyba: Očekáváno 5 argumentů, přijato {len(sys.argv) - 1}")
         sys.exit(1)
@@ -44,43 +44,50 @@ def main():
         print("Načítám audio soubory pomocí Pydub...")
         tts_audio = AudioSegment.from_mp3(TTS_TEMP_FILE)
         background_music = AudioSegment.from_mp3(music_path)
+        
+        # Klíčová kontrola hned po načtení
+        assert isinstance(tts_audio, AudioSegment), "Načtení TTS souboru do pydub selhalo."
+        assert isinstance(background_music, AudioSegment), "Načtení hudebního souboru do pydub selhalo."
 
         tts_duration_ms = len(tts_audio)
+        # NEPRŮSTŘELNÁ KONTROLA: Ověříme, že délka je platné číslo
+        assert isinstance(tts_duration_ms, int), f"Chyba: Délka TTS stopy (tts_duration_ms) není platné číslo, ale '{tts_duration_ms}'."
         print(f"Délka TTS stopy: {tts_duration_ms / 1000:.2f}s.")
 
         # Ujistíme se, že hudba je dostatečně dlouhá
-        required_length = INTRO_STABLE_MS + tts_duration_ms + OUTRO_STABLE_MS
+        required_length = INTRO_STABLE_MS + TRANSITION_FADE_MS + tts_duration_ms + TRANSITION_FADE_MS + OUTRO_STABLE_MS
         if len(background_music) < required_length:
             print("Hudba je příliš krátká, bude započata smyčka.")
             loops = (required_length // len(background_music)) + 1
             background_music = background_music * loops
 
-        # --- Vytvoření jednotlivých částí ---
-        print("Vytvářím a ověřuji jednotlivé hudební segmenty...")
+        # --- Definice a logování časových bodů ---
+        print("Počítám časové body...")
+        t1 = INTRO_STABLE_MS
+        t2 = t1 + TRANSITION_FADE_MS
+        t3 = t2 + tts_duration_ms
+        t4 = t3 + TRANSITION_FADE_MS
+        t5 = t4 + OUTRO_STABLE_MS
+        print(f"Časové body (v ms): t1={t1}, t2={t2}, t3={t3}, t4={t4}, t5={t5}")
 
-        # Úvodní plná hlasitost
-        intro_part = background_music[:INTRO_STABLE_MS]
-
-        # Fade-out přechod (ztlumí hudbu)
-        transition_out_part = background_music[INTRO_STABLE_MS:INTRO_STABLE_MS + FADE_DURATION_MS].fade(to_gain=DUCKING_DB, duration=FADE_DURATION_MS)
-
-        # Ztlumená část pro TTS
-        main_ducked_part = background_music[INTRO_STABLE_MS + FADE_DURATION_MS:INTRO_STABLE_MS + FADE_DURATION_MS + tts_duration_ms].apply_gain(DUCKING_DB)
-
-        # Fade-in přechod (hudba se vrací na plnou hlasitost)
-        transition_in_part = background_music[INTRO_STABLE_MS + FADE_DURATION_MS + tts_duration_ms:INTRO_STABLE_MS + FADE_DURATION_MS + tts_duration_ms + FADE_DURATION_MS].fade(from_gain=DUCKING_DB, duration=FADE_DURATION_MS)
-
-        # Závěrečná část hudby na plnou hlasitost
-        outro_part = background_music[INTRO_STABLE_MS + FADE_DURATION_MS + tts_duration_ms + FADE_DURATION_MS:INTRO_STABLE_MS + FADE_DURATION_MS + tts_duration_ms + FADE_DURATION_MS + OUTRO_STABLE_MS]
-
-        # --- Spojení všech částí ---
+        # --- Vytvoření jednotlivých segmentů hudby na pozadí ---
+        print("Vytvářím hudební segmenty...")
+        intro_part = background_music[0:t1]
+        transition_out_part = background_music[t1:t2].fade(to_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
+        main_ducked_part = background_music[t2:t3].apply_gain(DUCKING_DB)
+        transition_in_part = background_music[t3:t4].fade(from_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
+        outro_part = background_music[t4:t5]
+        
+        # --- Spojení hudebních segmentů do jednoho celku ---
+        print("Spojuji hudební segmenty...")
         final_background = intro_part + transition_out_part + main_ducked_part + transition_in_part + outro_part
-
-        # --- Přehrávání TTS na pozadí hudby ---
-        tts_position = INTRO_STABLE_MS + FADE_DURATION_MS  # Pozice, kde začíná TTS
+        assert isinstance(final_background, AudioSegment), "Spojení hudebních segmentů selhalo."
+        
+        # --- Překrytí řečí na správné místo ---
+        tts_position = t2
         print(f"Překrývám hudbu řečí na pozici {tts_position}ms...")
         final_mix_unfaded = final_background.overlay(tts_audio, position=tts_position)
-
+        
         # --- Finální úpravy ---
         print(f"Aplikuji finální fade-out ({FADEOUT_DURATION_MS}ms)...")
         final_mix = final_mix_unfaded.fade_out(duration=FADEOUT_DURATION_MS)
