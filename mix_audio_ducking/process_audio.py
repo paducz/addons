@@ -48,7 +48,7 @@ def main():
         tts_duration_ms = len(tts_audio)
         print(f"Délka TTS stopy: {tts_duration_ms / 1000:.2f}s.")
 
-        # --- A. Příprava hudebního podkresu s duckingem ---
+        # --- A. Příprava finálního hudebního podkresu s duckingem ---
         
         # Výpočet celkové délky finálního souboru
         total_duration_ms = INTRO_DURATION_MS + tts_duration_ms + OUTRO_DURATION_MS
@@ -63,26 +63,30 @@ def main():
         print(f"Připraven hudební podkres o délce {len(music_bed) / 1000:.2f}s.")
 
         # Definice časů pro ducking
-        duck_start_time = INTRO_DURATION_MS - (TRANSITION_FADE_MS // 2)
-        duck_end_time = INTRO_DURATION_MS + tts_duration_ms + (TRANSITION_FADE_MS // 2)
+        fade_out_start_time = INTRO_DURATION_MS
+        fade_in_start_time = INTRO_DURATION_MS + tts_duration_ms
 
-        # Vytvoření ztlumené verze hudby
-        ducked_music = music_bed.apply_gain(DUCKING_DB)
+        # Vytvoření ztlumené verze hudby pro střední část
+        quieter_section = music_bed[fade_out_start_time:fade_in_start_time].apply_gain(DUCKING_DB)
 
-        # Plynulý přechod DO ztlumení
+        # Zkombinování: začátek na plnou hlasitost + ztlumený střed + konec na plnou hlasitost
+        music_bed = music_bed[:fade_out_start_time] + quieter_section + music_bed[fade_in_start_time:]
+
+        # Aplikace plynulých přechodů na již zkombinovanou stopu
+        print(f"Aplikuji plynulý fade-out pro ducking v čase {fade_out_start_time}ms...")
         music_bed = music_bed.fade(
             to_gain=DUCKING_DB,
-            start=duck_start_time,
+            start=fade_out_start_time,
             duration=TRANSITION_FADE_MS
         )
 
-        # Plynulý přechod ZPĚT Z ztlumení
+        print(f"Aplikuji plynulý fade-in pro ducking v čase {fade_in_start_time}ms...")
         music_bed = music_bed.fade(
             from_gain=DUCKING_DB,
-            start=duck_end_time,
+            start=fade_in_start_time,
             duration=TRANSITION_FADE_MS
         )
-
+        
         # --- B. Příprava hlasové stopy s tichem na začátku ---
         print(f"Vytvářím hlasovou stopu s {INTRO_DURATION_MS}ms ticha na začátku...")
         silence_before = AudioSegment.silent(duration=INTRO_DURATION_MS)
