@@ -1,8 +1,9 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bash
 
 # ==============================================================================
 # = This script runs as a persistent service, listening for jobs on stdin.    =
-# = It safely merges default values from the configuration with stdin data.  =
+# = It reads defaults from /data/options.json and merges them with stdin.    =
+# = THIS VERSION DOES NOT USE BASHIO AND IS THE CORRECT SERVICE PATTERN.       =
 # ==============================================================================
 
 echo "-----------------------------------------------------------"
@@ -18,24 +19,30 @@ while true; do
 
     # Check for non-empty data
     if [ -n "$line" ]; then
-        bashio::log.info "================ NEW JOB RECEIVED ================"
-        bashio::log.debug "Raw stdin data: $line"
-
+        echo "================ NEW JOB RECEIVED ================"
+        
         # --- Safely build the final configuration ---
         
-        # Start with the default configuration from the UI.
-        # Handle the case where there are no options by defaulting to an empty JSON object '{}'.
-        DEFAULT_CONFIG=$(bashio::config | jq --compact-output 'select(length > 0) // {}')
+        # Step 1: Read the default configuration file.
+        # Default to an empty JSON object '{}' if the file doesn't exist or is empty.
+        if [ -s /data/options.json ]; then
+            DEFAULT_CONFIG=$(cat /data/options.json)
+        else
+            DEFAULT_CONFIG="{}"
+        fi
 
-        # Handle the case where stdin might be invalid JSON by defaulting to an empty JSON object.
-        STDIN_CONFIG=$(echo "$line" | jq --compact-output '. // {}')
-        
-        # Merge the two. The stdin data (`.[1]`) will overwrite the defaults (`.[0]`).
-        # This is now safe even if one or both inputs are empty.
+        # Step 2: Read the configuration from stdin.
+        # Default to an empty JSON object '{}' if the stdin is not valid JSON.
+        if echo "$line" | jq -e . >/dev/null; then
+            STDIN_CONFIG="$line"
+        else
+            echo "Error: Received invalid JSON on stdin. Ignoring request."
+            STDIN_CONFIG="{}"
+        fi
+
+        # Step 3: Merge the two. The stdin data (`.[1]`) will overwrite the defaults (`.[0]`).
         FINAL_CONFIG=$(jq -s '.[0] * .[1]' <(echo "$DEFAULT_CONFIG") <(echo "$STDIN_CONFIG"))
         
-        bashio::log.debug "Final merged config: $FINAL_CONFIG"
-
         # --- Extract final values from the merged JSON ---
         API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
         VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
@@ -44,17 +51,16 @@ while true; do
         OUTPUT_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.output_filename // ""')
 
         # --- Validate mandatory parameters ---
-        # The API key MUST be in the configuration.
-        if ! bashio::config.has_value 'elevenlabs_api_key'; then
-             bashio::log.error "Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
+        if [ -z "$API_KEY" ] || [[ "$API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
+             echo "Error: Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
         elif [ -z "$TEXT_TO_SPEAK" ]; then
-            bashio::log.error "Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
+            echo "Error: Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
         elif [ -z "$OUTPUT_FILENAME" ]; then
-            bashio::log.error "Mandatory parameter 'output_filename' was not provided in the request. Aborting job."
+            echo "Error: Mandatory parameter 'output_filename' was not provided in the request. Aborting job."
         else
-            bashio::log.info "Job is valid. Starting Python audio processor..."
-            bashio::log.info "  - Voice: $VOICE_ID"
-            bashio::log.info "  - Music: $MUSIC_FILENAME"
+            echo "Job is valid. Starting Python audio processor..."
+            echo "  - Voice: $VOICE_ID"
+            echo "  - Music: $MUSIC_FILENAME"
             # --- Call the Python script with the final, validated data ---
             /process_audio.py \
                 "$API_KEY" \
@@ -64,8 +70,8 @@ while true; do
                 "$OUTPUT_FILENAME"
         fi
         
-        bashio::log.info "=============== JOB-HANDLING FINISHED ==============="
-        bashio::log.info "Waiting for next job..."
+        echo "=============== JOB-HANDLING FINISHED ==============="
+        echo "Waiting for next job..."
     fi
     
     sleep 1
