@@ -1,15 +1,15 @@
-# !! NOUZOVÉ ŘEŠENÍ POUZE PRO aarch64 (Raspberry Pi atd.) !!
-# Toto řešení není přenositelné na jiné platformy (např. Intel PC).
-# Správný způsob je `FROM %%BASE_IMAGE%%`, ale toto může pomoci, pokud
-# je váš Supervisor zaseknutý.
-FROM ghcr.io/home-assistant/aarch64-base-debian:bullseye
+# Použijeme speciální proměnnou, kterou Home Assistant Supervisor
+# automaticky nahradí správným a aktuálním základním obrazem.
+FROM %%BASE_IMAGE%%
 
 # Aktualizujeme a nainstalujeme potřebné balíčky
+# PŘIDÁNA PODPORA PRO 'bc' (Basic Calculator) pro matematické operace s desetinnými čísly
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     ffmpeg \
     jq \
+    bc \
     && rm -rf /var/lib/apt/lists/*
 
 # Nainstalujeme Python knihovnu pro ElevenLabs
