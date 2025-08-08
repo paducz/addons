@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Proces: hudba + TTS
+Process: music + TTS
 
-1) 4 s hudba na plnou hlasitost
-2) 0,5 s plynulý fade-out (−18 dB)
-3) TTS přes ztlumenou hudbu
-4) 0,5 s fade-in zpět na plnou hlasitost
-5) 3 s hudba na plnou hlasitost
-6) 1 s závěrečný fade-out
+Timeline:
+1) 4 s music full
+2) fade-out to −18 dB (TTS starts at the *middle* of this fade)
+3) ducked bed under TTS
+4) fade-in back to full (TTS ends at the *middle* of this fade)
+5) 3 s music full
+6) final 1 s fade-out (whole mix)
 """
 
 import os
@@ -15,12 +16,12 @@ import sys
 from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
-# === PARAMETRY ==============================================================
-INTRO_FULL_MS   = 4_000      # 4 s úvod
-DUCK_FADE_MS    =  1100      # přechody (fade-out a fade-in)
-DUCK_LEVEL_DB   =  -19       # útlum během TTS
-OUTRO_FULL_MS   = 4_000      # 3 s plná hlasitost na konci
-FINAL_FADE_MS   = 1_500      # závěrečný fade-out
+# === CONFIG =================================================================
+INTRO_FULL_MS   = 4_000      # 4 s full intro
+DUCK_FADE_MS    =  1000      # nominal fade length; may shrink if TTS is very short
+DUCK_LEVEL_DB   =  -19       # duck amount during TTS
+OUTRO_FULL_MS   = 4_000      # 3 s full at the end
+FINAL_FADE_MS   = 2_000      # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
 
@@ -30,17 +31,17 @@ def die(msg: str) -> None:
 
 def safe_seg(seg, label):
     if seg is None:
-        die(f"Segment '{label}' je None (pravděpodobně chybný slice)")
+        die(f"Segment '{label}' is None (bad slice)")
     return seg
 
 def main() -> None:
     if len(sys.argv) != 6:
-        die(f"Očekáváno 5 argumentů, dostal jsem {len(sys.argv) - 1}")
+        die(f"Expected 5 args, got {len(sys.argv) - 1}")
 
     api_key, voice_id, music_path, text_to_speak, output_path = sys.argv[1:6]
 
-    # --- 1) TTS --------------------------------------------------------------
-    print("⏳  Generuji TTS…")
+    # --- TTS -----------------------------------------------------------------
+    print("⏳  Generating TTS…")
     try:
         client = ElevenLabs(api_key=api_key)
         stream = client.text_to_speech.convert(
@@ -52,75 +53,88 @@ def main() -> None:
             for chunk in stream:
                 f.write(chunk)
         if not os.path.getsize(TTS_TEMP_FILE):
-            die("Vygenerovaný TTS soubor je prázdný.")
+            die("Generated TTS file is empty.")
         tts_audio = AudioSegment.from_mp3(TTS_TEMP_FILE)
     except Exception as e:
-        die(f"TTS selhalo: {e}")
+        die(f"TTS failed: {e}")
 
     tts_len = len(tts_audio)
-    print(f"   ✔️  Délka TTS: {tts_len/1000:.2f} s")
+    if tts_len <= 0:
+        die("TTS audio has zero length.")
+    print(f"   ✔️  TTS length: {tts_len/1000:.2f} s")
 
-    # --- 2) Hudba ------------------------------------------------------------
+    # Use an effective fade that guarantees: start/end happen at fade middles
+    eff_fade_ms = min(DUCK_FADE_MS, tts_len)
+
+    # --- Music ---------------------------------------------------------------
     try:
         music = AudioSegment.from_mp3(music_path)
     except Exception as e:
-        die(f"Nelze načíst hudbu '{music_path}': {e}")
+        die(f"Cannot load music '{music_path}': {e}")
 
-    need_ms = INTRO_FULL_MS + DUCK_FADE_MS + tts_len + DUCK_FADE_MS + OUTRO_FULL_MS
+    # Required total bed length:
+    # intro + (fade-out + duck + fade-in) + outro
+    duck_main_len = max(tts_len - eff_fade_ms, 0)  # TTS spans half-fade + duck + half-fade
+    need_ms = INTRO_FULL_MS + eff_fade_ms + duck_main_len + eff_fade_ms + OUTRO_FULL_MS
+
     if len(music) < need_ms:
         loops = -(-need_ms // len(music))  # ceil division
         music *= loops
-        print(f"   ℹ️  Hudba krátká → nasmyčkováno ×{loops}")
+        print(f"   ℹ️  Music too short → looped ×{loops}")
 
-    # --- 3) Segmentace -------------------------------------------------------
+    # --- Segment the bed -----------------------------------------------------
     i = 0
     intro_full = safe_seg(music[i : i + INTRO_FULL_MS], "intro_full")
     i += INTRO_FULL_MS
 
-    # Fade-out: plno → −18 dB
-    intro_fade_out = safe_seg(
-        music[i : i + DUCK_FADE_MS].fade(
+    # Fade-out: full → duck (TTS will start at the *middle* of this segment)
+    fade_out = safe_seg(
+        music[i : i + eff_fade_ms].fade(
             from_gain=0,
             to_gain=DUCK_LEVEL_DB,
-            start=0,                # <- klíčový parametr
-            duration=DUCK_FADE_MS,
+            start=0,                # important: avoid None + int in pydub
+            duration=eff_fade_ms,
         ),
-        "intro_fade_out",
+        "fade_out",
     )
-    i += DUCK_FADE_MS
+    i += eff_fade_ms
 
-    tts_bg = safe_seg(
-        music[i : i + tts_len].apply_gain(DUCK_LEVEL_DB),
-        "tts_bg",
+    # Ducked main (under the body of TTS)
+    duck_main = safe_seg(
+        music[i : i + duck_main_len].apply_gain(DUCK_LEVEL_DB),
+        "duck_main",
     )
-    i += tts_len
+    i += duck_main_len
 
-    # Fade-in: −18 dB → plno
-    outro_fade_in = safe_seg(
-        music[i : i + DUCK_FADE_MS].fade(
+    # Fade-in: duck → full (TTS will end at the *middle* of this segment)
+    fade_in = safe_seg(
+        music[i : i + eff_fade_ms].fade(
             from_gain=DUCK_LEVEL_DB,
             to_gain=0,
-            start=0,                # <- klíčový parametr
-            duration=DUCK_FADE_MS,
+            start=0,                # important
+            duration=eff_fade_ms,
         ),
-        "outro_fade_in",
+        "fade_in",
     )
-    i += DUCK_FADE_MS
+    i += eff_fade_ms
 
     outro_full = safe_seg(music[i : i + OUTRO_FULL_MS], "outro_full")
     i += OUTRO_FULL_MS
 
-    # --- 4) Sestavení --------------------------------------------------------
-    bg_mix = intro_full + intro_fade_out + tts_bg + outro_fade_in + outro_full
-    tts_start = INTRO_FULL_MS + DUCK_FADE_MS  # = 4 000 + 500 ms
-    mix = bg_mix.overlay(tts_audio, position=tts_start)
+    # Assemble the bed
+    bed = intro_full + fade_out + duck_main + fade_in + outro_full
 
-    # --- 5) Závěrečný fade-out a export -------------------------------------
+    # --- Overlay TTS ---------------------------------------------------------
+    # TTS starts at the middle of fade-out, ends at the middle of fade-in
+    tts_start = INTRO_FULL_MS + (eff_fade_ms // 2)
+    mix = bed.overlay(tts_audio, position=tts_start)
+
+    # --- Final fade & export -------------------------------------------------
     final = mix.fade_out(FINAL_FADE_MS)
     final.export(output_path, format="mp3")
-    print(f"✅  Hotovo → {output_path}")
+    print(f"✅  Done → {output_path}")
 
-    # --- 6) Úklid ------------------------------------------------------------
+    # --- Cleanup -------------------------------------------------------------
     if os.path.exists(TTS_TEMP_FILE):
         os.remove(TTS_TEMP_FILE)
 
