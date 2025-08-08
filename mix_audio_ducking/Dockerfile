@@ -1,6 +1,8 @@
 # Použijeme speciální proměnnou, kterou Home Assistant Supervisor
 # automaticky nahradí správným a aktuálním základním obrazem.
-FROM %%BASE_IMAGE%%
+#FROM %%BASE_IMAGE%%
+FROM ghcr.io/home-assistant/aarch64-base-debian:bullseye
+
 
 # Aktualizujeme a nainstalujeme potřebné balíčky
 # PŘIDÁNA PODPORA PRO 'bc' (Basic Calculator) pro matematické operace s desetinnými čísly
