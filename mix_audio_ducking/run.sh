@@ -25,10 +25,12 @@ TEXT_TO_SPEAK=$(echo "$CONFIG" | jq -r '.text_to_speak')
 OUTPUT_FILENAME=$(echo "$CONFIG" | jq -r '.output_filename')
 
 bashio::log.info "Cílový výstupní soubor: /share/${OUTPUT_FILENAME}"
+bashio::log.info "Hudební soubor: '${MUSIC_FILENAME}'"
 bashio::log.info "Text k přečtení: '${TEXT_TO_SPEAK}'"
 
 # --- 2. Definice cest k souborům ---
-MUSIC_PATH="/share/${MUSIC_FILENAME}"
+# Použijeme cestu k hudbě přesně tak, jak je zadaná v konfiguraci.
+MUSIC_PATH="${MUSIC_FILENAME}"
 TTS_PATH="/tmp/tts.mp3"
 OUTPUT_PATH="/share/${OUTPUT_FILENAME}"
 INTRO_PATH="/tmp/intro.mp3"
@@ -39,12 +41,13 @@ CONCAT_LIST_PATH="/tmp/concat_list.txt"
 FINAL_UNFADED_PATH="/tmp/final_unfaded.mp3"
 
 # --- 3. Validace vstupů ---
-if [[ "$ELEVENLABS_API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
+if [[ "$ELEVENLABS_API_KEY" == "YOUR_ELEVENLABS_API_KEY" || -z "$ELEVENLABS_API_KEY" ]]; then
     bashio::log.fatal "Prosím, nastavte váš API klíč pro ElevenLabs v konfiguraci doplňku."
     exit 1
 fi
+# Kontrolujeme existenci souboru na zadané absolutní cestě.
 if [ ! -f "$MUSIC_PATH" ]; then
-    bashio::log.fatal "Hudební soubor '${MUSIC_FILENAME}' nebyl nalezen ve složce /share."
+    bashio::log.fatal "Hudební soubor nebyl nalezen na zadané cestě: '${MUSIC_PATH}'. Ujistěte se, že cesta je správná a doplněk má k ní přístup (přes 'map' v config.yaml)."
     exit 1
 fi
 
@@ -59,7 +62,7 @@ with open("${TTS_PATH}", "wb") as f:
 EOF
 python3 /tmp/generate_tts.py
 if [ ! -f "$TTS_PATH" ]; then
-    bashio::log.fatal "Generování TTS selhalo."
+    bashio::log.fatal "Generování TTS selhalo. Zkontrolujte API klíč, ID hlasu a připojení k internetu."
     exit 1
 fi
 

@@ -1,7 +1,7 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: "Audio Mixer with Ducking (Triggerable)"
 description: "Generates TTS and mixes it with music from /media or /share. Can be triggered by automations."
-version: "1.2.0" # Zvýšíme verzi, abychom reflektovali změnu
+version: "1.2.1" # Zvýšíme verzi, abychom reflektovali změnu
 slug: "mix_audio_ducking"
 arch:
   - aarch64
