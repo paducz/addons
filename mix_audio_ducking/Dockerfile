@@ -3,7 +3,7 @@ FROM ${BUILD_FROM}
 
 LABEL maintainer="TvojeJmeno <email@example.com>"
 
-RUN apt-get update          && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip          && apt-get clean          && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ffmpeg python3 py3-pip
 
 COPY requirements.txt /requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
