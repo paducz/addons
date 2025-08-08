@@ -12,8 +12,6 @@ arch:
 # This is the key change: we tell HA this is a long-running service
 startup: "services"
 init: false
-# We also need to add the 'watchdog' to ensure it keeps running
-watchdog: "bashio::log.info 'Monitoring loop is active.'"
 
 audio: true
 map:
