@@ -1,13 +1,23 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
-FROM ${BUILD_FROM}
+# Použijeme oficiální základní obraz pro doplňky Home Assistant
+FROM homeassistant/base-debian:bullseye
 
-LABEL maintainer="TvojeJmeno <email@example.com>"
+# Aktualizujeme a nainstalujeme potřebné balíčky
+# - python3 a pip pro spuštění skriptu pro ElevenLabs
+# - ffmpeg pro veškeré operace se zvukem
+# - jq pro snadnější práci s JSON (i když zde používáme bashio)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apk add --no-cache ffmpeg python3 py3-pip
+# Nainstalujeme Python knihovnu pro ElevenLabs
+RUN pip3 install elevenlabs
 
-COPY requirements.txt /requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /requirements.txt
+# Zkopírujeme spouštěcí skript do kontejneru a nastavíme mu práva pro spuštění
+COPY run.sh /
+RUN chmod +x /run.sh
 
-# S6 service script
-COPY run.sh /etc/services.d/mix_audio/run
-RUN chmod +x /etc/services.d/mix_audio/run
+# Příkaz, který se spustí při startu kontejneru
+CMD [ "/run.sh" ]

@@ -1,26 +1,32 @@
-name: Mix Audio with Ducking
-version: "1.0.0"
-slug: mix_audio_ducking
-description: >
-  Generates TTS via ElevenLabs and mixes with background music including intro, ducking, outro and fade-out.
+# https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
+name: "Audio Mixer with Ducking (Triggerable)"
+description: "Generates TTS and mixes it with music. Can be triggered by automations."
+version: "1.1.0" # Zvýšíme verzi, abychom viděli změnu
+slug: "mix_audio_ducking"
 arch:
-  - amd64
-  - armv7
   - aarch64
-startup: services
-boot: auto
-host_network: false
-ports:
-  8080/tcp: 8080
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: "application"
+init: false
+audio: true
 map:
-  - share
+  - share:rw
+
+# Hodnoty zde slouží jako VÝCHOZÍ. Mohou být přepsány daty z automatizace.
 options:
-  audio_dir: /share/audio
-  port: 8080
-  auth_token: ""
-  eleven_key: ""
+  elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
+  voice_id: "21m00Tcm4TlvDq8ikWAM"
+  music_filename: "background_music.mp3"
+  # Tyto hodnoty budou typicky přepsány automatizací
+  text_to_speak: "This is a default message. Provide text in your automation."
+  output_filename: "default_mix.mp3"
+
 schema:
-  audio_dir: "str?"
-  port: "int?"
-  auth_token: "str?"
-  eleven_key: "str"
+  elevenlabs_api_key: "str"
+  voice_id: "str"
+  music_filename: "str"
+  text_to_speak: "str"
+  output_filename: "str"
