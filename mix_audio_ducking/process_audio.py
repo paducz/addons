@@ -4,14 +4,14 @@ import os
 from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
-# --- Konfigurace efektů ---
-INTRO_DURATION_MS = 1000      # 1 sekunda
-OUTRO_DURATION_MS = 1000      # 1 sekunda
+# --- KONFIGURACE EFEKTŮ ---
+# Upraveno dle vaší nové specifikace
+INTRO_DURATION_MS = 4000      # Délka úvodní hudby na plnou hlasitost
+OUTRO_DURATION_MS = 3000      # Délka závěrečné hudby na plnou hlasitost
 FADEOUT_DURATION_MS = 1000    # Finální zeslabení celého klipu
-# O kolik decibelů ztlumit hudbu během řeči. Záporné číslo znamená ztlumení.
-DUCKING_DB = -15
-# Délka přechodu (fade) pro ducking efekt. Zajišťuje plynulost.
-DUCKING_FADE_MS = 250
+DUCKING_DB = -18              # O kolik decibelů ztlumit hudbu (doporučuji trochu víc pro lepší srozumitelnost)
+# Délka přechodu (crossfade) mezi segmenty. Zajišťuje plynulost.
+CROSSFADE_DURATION_MS = 500
 
 # Cesta k dočasnému souboru pro TTS
 TTS_TEMP_FILE = "/tmp/tts.mp3"
@@ -66,40 +66,45 @@ def main():
             loops = (required_length // len(background_music)) + 1
             background_music = background_music * loops
         
-        # Ořízneme hudbu na přesnou potřebnou délku
-        final_music = background_music[:required_length]
+        # --- Vytvoření jednotlivých segmentů ---
+        print("Vytvářím jednotlivé segmenty...")
 
-        # --- Aplikace plynulého duckingu s přechody (crossfading) ---
+        # Segment 1: Úvod (4 sekundy, plná hlasitost)
+        intro_segment = background_music[0:INTRO_DURATION_MS]
+
+        # Segment 2: Hlavní část pod řečí
+        main_segment_start = INTRO_DURATION_MS
+        main_segment_end = INTRO_DURATION_MS + tts_duration_ms
+        main_segment_music = background_music[main_segment_start:main_segment_end]
         
-        # 1. Plynulé zeslabení před začátkem řeči
-        print("Vytvářím plynulé intro...")
-        start_of_tts = INTRO_DURATION_MS
-        final_mix = final_music.fade(
-            to_gain=DUCKING_DB,
-            start=start_of_tts - DUCKING_FADE_MS,
-            duration=DUCKING_FADE_MS # OPRAVA: Odstraněn argument 'end'
-        )
+        # Ztlumení hlavní části a překrytí řečí
+        print(f"Aplikuji ducking ({DUCKING_DB} dB) na hlavní část...")
+        ducked_main_segment = main_segment_music.apply_gain(DUCKING_DB)
+        main_with_tts = ducked_main_segment.overlay(tts_audio)
 
-        # 2. Plynulé zesílení po skončení řeči
-        print("Vytvářím plynulé outro...")
-        end_of_tts = INTRO_DURATION_MS + tts_duration_ms
-        final_mix = final_mix.fade(
-            from_gain=DUCKING_DB,
-            start=end_of_tts,
-            duration=DUCKING_FADE_MS # OPRAVA: Odstraněn argument 'end'
-        )
-        
-        # 3. Překrytí řečí
-        print("Překrývám hudbu řečí...")
-        final_mix = final_mix.overlay(tts_audio, position=INTRO_DURATION_MS)
+        # Segment 3: Závěr (3 sekundy, plná hlasitost)
+        outro_segment_start = main_segment_end
+        outro_segment_end = main_segment_end + OUTRO_DURATION_MS
+        outro_segment = background_music[outro_segment_start:outro_segment_end]
 
-        # 4. Finální zeslabení (fade-out) na konci celé stopy
+        # --- Spojení segmentů s plynulými přechody (Crossfade) ---
+        print(f"Spojuji segmenty s plynulým přechodem ({CROSSFADE_DURATION_MS}ms)...")
+
+        # Spojení intra s hlavní částí
+        # .append() s crossfade zajistí plynulý přechod z hlasité do tiché
+        part1 = intro_segment.append(main_with_tts, crossfade=CROSSFADE_DURATION_MS)
+
+        # Spojení výsledku s outrem
+        # .append() s crossfade zde zajistí plynulý přechod z tiché do hlasité
+        final_audio_unfaded = part1.append(outro_segment, crossfade=CROSSFADE_DURATION_MS)
+
+        # --- Finální úpravy ---
         print(f"Aplikuji finální fade-out ({FADEOUT_DURATION_MS}ms)...")
-        final_mix = final_mix.fade_out(duration=FADEOUT_DURATION_MS)
+        final_audio = final_audio_unfaded.fade_out(duration=FADEOUT_DURATION_MS)
 
-        # 5. Export finálního souboru
+        # Export finálního souboru
         print(f"Exportuji finální soubor do: {output_path}")
-        final_mix.export(output_path, format="mp3")
+        final_audio.export(output_path, format="mp3")
 
     except Exception as e:
         print(f"Chyba při zpracování zvuku s Pydub: {e}")
