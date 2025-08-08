@@ -2,13 +2,12 @@
 
 # ==============================================================================
 # = This script runs as a persistent service, listening for jobs on stdin.    =
-# = It uses bashio to read default values and merges them with stdin data.   =
+# = It safely merges default values from the configuration with stdin data.  =
 # ==============================================================================
 
 echo "-----------------------------------------------------------"
 echo "            Audio Mixer Service has started"
 echo " This add-on is now running as a persistent service."
-echo " Reading default configuration..."
 echo " Waiting for JSON requests on stdin from Home Assistant..."
 echo "-----------------------------------------------------------"
 
@@ -22,25 +21,30 @@ while true; do
         bashio::log.info "================ NEW JOB RECEIVED ================"
         bashio::log.debug "Raw stdin data: $line"
 
-        # --- Build the final configuration in one step ---
-        # 1. Create a JSON object from the add-on's default config.
-        # 2. Create a JSON object from the stdin line.
-        # 3. Use 'jq' to merge them. The stdin data (`.[1]`) will overwrite the defaults (`.[0]`).
+        # --- Safely build the final configuration ---
         
-        DEFAULT_CONFIG=$(bashio::config | jq --compact-output)
+        # Start with the default configuration from the UI.
+        # Handle the case where there are no options by defaulting to an empty JSON object '{}'.
+        DEFAULT_CONFIG=$(bashio::config | jq --compact-output 'select(length > 0) // {}')
+
+        # Handle the case where stdin might be invalid JSON by defaulting to an empty JSON object.
+        STDIN_CONFIG=$(echo "$line" | jq --compact-output '. // {}')
         
-        FINAL_CONFIG=$(jq -s '.[0] * .[1]' <(echo "$DEFAULT_CONFIG") <(echo "$line"))
+        # Merge the two. The stdin data (`.[1]`) will overwrite the defaults (`.[0]`).
+        # This is now safe even if one or both inputs are empty.
+        FINAL_CONFIG=$(jq -s '.[0] * .[1]' <(echo "$DEFAULT_CONFIG") <(echo "$STDIN_CONFIG"))
         
         bashio::log.debug "Final merged config: $FINAL_CONFIG"
 
         # --- Extract final values from the merged JSON ---
-        API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key')
-        VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id')
-        MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename')
+        API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
+        VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
+        MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
         TEXT_TO_SPEAK=$(echo "$FINAL_CONFIG" | jq -r '.text_to_speak // ""')
         OUTPUT_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.output_filename // ""')
 
         # --- Validate mandatory parameters ---
+        # The API key MUST be in the configuration.
         if ! bashio::config.has_value 'elevenlabs_api_key'; then
              bashio::log.error "Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
         elif [ -z "$TEXT_TO_SPEAK" ]; then
