@@ -69,35 +69,27 @@ def main():
         # Ořízneme hudbu na přesnou potřebnou délku
         final_music = background_music[:required_length]
 
-        # Vytvoříme tichou verzi hudby pro ducking
-        quieter_music = final_music.apply_gain(DUCKING_DB)
-
         # --- Aplikace plynulého duckingu s přechody (crossfading) ---
         
-        # 1. Začátek: Intro s normální hlasitostí
-        # Zeslabíme konec intra, aby plynule přešlo do ztlumené části
+        # 1. Plynulé zeslabení před začátkem řeči
         print("Vytvářím plynulé intro...")
         start_of_tts = INTRO_DURATION_MS
         final_mix = final_music.fade(
             to_gain=DUCKING_DB,
             start=start_of_tts - DUCKING_FADE_MS,
-            end=start_of_tts,
-            duration=DUCKING_FADE_MS # Použijeme kratší fade pro přirozenější zvuk
+            duration=DUCKING_FADE_MS # OPRAVA: Odstraněn argument 'end'
         )
 
-        # 2. Konec: Outro s normální hlasitostí
-        # Zesílíme začátek outra, aby plynule navázal na ztlumenou část
+        # 2. Plynulé zesílení po skončení řeči
         print("Vytvářím plynulé outro...")
         end_of_tts = INTRO_DURATION_MS + tts_duration_ms
         final_mix = final_mix.fade(
             from_gain=DUCKING_DB,
             start=end_of_tts,
-            end=end_of_tts + DUCKING_FADE_MS,
-            duration=DUCKING_FADE_MS
+            duration=DUCKING_FADE_MS # OPRAVA: Odstraněn argument 'end'
         )
         
         # 3. Překrytí řečí
-        # Překryjeme řeč na již připravenou hudbu s plynulým duckingem
         print("Překrývám hudbu řečí...")
         final_mix = final_mix.overlay(tts_audio, position=INTRO_DURATION_MS)
 
