@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/with-contenv bash
 set -e
 
 AUDIO_DIR="${AUDIO_DIR:-/share/audio}"

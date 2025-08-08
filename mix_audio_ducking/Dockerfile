@@ -8,8 +8,6 @@ RUN apk add --no-cache ffmpeg python3 py3-pip
 COPY requirements.txt /requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /requirements.txt
 
-COPY run.sh /run.sh
-COPY mix.py /mix.py
-RUN chmod a+x /run.sh
-
-CMD [ "/run.sh" ]
+# S6 service script
+COPY run.sh /etc/services.d/mix_audio/run
+RUN chmod +x /etc/services.d/mix_audio/run
