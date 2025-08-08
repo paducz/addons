@@ -1,10 +1,9 @@
-# Použijeme oficiální základní obraz pro doplňky Home Assistant
-FROM homeassistant/base-debian:bullseye
+# Použijeme speciální proměnnou, kterou Home Assistant Supervisor
+# automaticky nahradí správným a aktuálním základním obrazem.
+# Tím je zajištěna kompatibilita a dlouhodobá funkčnost.
+FROM %%BASE_IMAGE%%
 
 # Aktualizujeme a nainstalujeme potřebné balíčky
-# - python3 a pip pro spuštění skriptu pro ElevenLabs
-# - ffmpeg pro veškeré operace se zvukem
-# - jq pro snadnější práci s JSON (i když zde používáme bashio)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
