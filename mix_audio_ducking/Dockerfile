@@ -1,7 +1,8 @@
-# Použijeme speciální proměnnou, kterou Home Assistant Supervisor
-# automaticky nahradí správným a aktuálním základním obrazem.
-# Tím je zajištěna kompatibilita a dlouhodobá funkčnost.
-FROM %%BASE_IMAGE%%
+# !! NOUZOVÉ ŘEŠENÍ POUZE PRO aarch64 (Raspberry Pi atd.) !!
+# Toto řešení není přenositelné na jiné platformy (např. Intel PC).
+# Správný způsob je `FROM %%BASE_IMAGE%%`, ale toto může pomoci, pokud
+# je váš Supervisor zaseknutý.
+FROM ghcr.io/home-assistant/aarch64-base-debian:bullseye
 
 # Aktualizujeme a nainstalujeme potřebné balíčky
 RUN apt-get update && apt-get install -y --no-install-recommends \
