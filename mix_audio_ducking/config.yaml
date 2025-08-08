@@ -1,7 +1,7 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: "Audio Mixer with Ducking (Triggerable)"
-description: "Generates TTS and mixes it with music. Can be triggered by automations."
-version: "1.1.0" # Zvýšíme verzi, abychom viděli změnu
+description: "Generates TTS and mixes it with music from /media or /share. Can be triggered by automations."
+version: "1.2.0" # Zvýšíme verzi, abychom reflektovali změnu
 slug: "mix_audio_ducking"
 arch:
   - aarch64
@@ -12,15 +12,18 @@ arch:
 startup: "application"
 init: false
 audio: true
+
+# Zde je klíčová změna: přidáváme přístup ke složce /media
 map:
-  - share:rw
+  - share:rw   # Přístup pro zápis a čtení do /share (pro výstupní soubor)
+  - media:ro   # Přístup POUZE PRO ČTENÍ do /media (pro hudbu na pozadí)
 
 # Hodnoty zde slouží jako VÝCHOZÍ. Mohou být přepsány daty z automatizace.
 options:
   elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
   voice_id: "21m00Tcm4TlvDq8ikWAM"
-  music_filename: "background_music.mp3"
-  # Tyto hodnoty budou typicky přepsány automatizací
+  # Upravíme příklad, aby ukazoval na soubor v /media
+  music_filename: "local/background_music.mp3"
   text_to_speak: "This is a default message. Provide text in your automation."
   output_filename: "default_mix.mp3"
 
