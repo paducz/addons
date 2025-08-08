@@ -17,10 +17,10 @@ from elevenlabs.client import ElevenLabs
 
 # === PARAMETRY ==============================================================
 INTRO_FULL_MS   = 4_000      # 4 s úvod
-DUCK_FADE_MS    =  1000      # přechody (fade-out a fade-in)
-DUCK_LEVEL_DB   =  -18       # útlum během TTS
-OUTRO_FULL_MS   = 3_000      # 3 s plná hlasitost na konci
-FINAL_FADE_MS   = 1_000      # závěrečný fade-out
+DUCK_FADE_MS    =  1100      # přechody (fade-out a fade-in)
+DUCK_LEVEL_DB   =  -19       # útlum během TTS
+OUTRO_FULL_MS   = 4_000      # 3 s plná hlasitost na konci
+FINAL_FADE_MS   = 1_500      # závěrečný fade-out
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
 
