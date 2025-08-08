@@ -1,7 +1,7 @@
 # config.yaml
-name: "Audio Mixer Service"
-description: "A persistent service that listens for requests to generate audio files."
-version: "6.0.0" # A new architecture deserves a new major version
+name: "Audio Mixer Bash Service"
+description: "A service that generates audio by listening for jobs on stdin, orchestrated by Bash."
+version: "6.0.0" # Final architecture
 slug: "mix_audio_ducking"
 arch:
   - aarch64
@@ -9,15 +9,13 @@ arch:
   - armhf
   - armv7
   - i386
-# This is the key change: we tell HA this is a long-running service
-startup: "services"
+startup: "service"
 init: false
-
-audio: true
 map:
   - share:rw
   - media:rw
 
+# Options here act as DEFAULTS. They can be overridden by the HA script.
 options:
   elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
   voice_id: "21m00Tcm4TlvDq8ikWAM"
