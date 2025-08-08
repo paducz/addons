@@ -15,4 +15,6 @@ COPY run.sh /run.sh
 COPY mix.py /mix.py
 RUN chmod a+x /run.sh
 
-CMD [ "/run.sh" ]
+COPY run.sh /run.sh
+COPY etc /etc
+RUN chmod +x /run.sh /etc/services.d/mix/run
