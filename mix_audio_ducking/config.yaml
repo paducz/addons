@@ -1,7 +1,7 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
-name: "Audio Mixer with Ducking (Triggerable)"
-description: "Generates TTS and mixes it with music. Output is saved to /media."
-version: "3.0.0" # Velká změna, zaslouží si novou hlavní verzi
+name: "Audio Mixer with Pydub"
+description: "Generates TTS and mixes it with music using Pydub. Output is saved to /media."
+version: "4.0.0" # Nová architektura, nová hlavní verze
 slug: "mix_audio_ducking"
 arch:
   - aarch64
@@ -12,21 +12,16 @@ arch:
 startup: "application"
 init: false
 audio: true
-
-# Zde je klíčová změna: povolujeme ZÁPIS do složky /media
 map:
-  - share:rw   # Ponecháme pro případné další využití
-  - media:rw   # Změněno z 'ro' na 'rw' (read-write)
+  - share:rw
+  - media:rw
 
-# Hodnoty zde slouží jako VÝCHOZÍ. Mohou být přepsány daty z automatizace.
 options:
   elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
   voice_id: "21m00Tcm4TlvDq8ikWAM"
-  # Cesta k hudbě na pozadí (může být v /media nebo /share)
   music_filename: "/media/sounds/ambient_story_1.mp3"
-  text_to_speak: "This is a default message. Provide text in your automation."
-  # Výstupní soubor nyní také směřuje do /media
-  output_filename: "/media/local/default_mix.mp3"
+  text_to_speak: "This is a test run of the new Pydub-based add-on."
+  output_filename: "/media/local/pydub_mix.mp3"
 
 schema:
   elevenlabs_api_key: "str"
