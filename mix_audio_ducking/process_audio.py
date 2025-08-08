@@ -5,9 +5,10 @@ from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
 # --- KONFIGURACE EFEKTŮ ---
-INTRO_DURATION_MS = 4000      # Délka úvodní hudby na plnou hlasitost
-OUTRO_DURATION_MS = 3000      # Délka závěrečné hudby na plnou hlasitost
-TRANSITION_FADE_MS = 500      # Délka přechodu (fade in/out) pro ducking
+# Upraveno dle vaší finální specifikace
+INTRO_STABLE_MS = 4000      # Délka úvodní hudby na plnou hlasitost
+OUTRO_STABLE_MS = 3000      # Délka závěrečné hudby na plnou hlasitost
+TRANSITION_FADE_MS = 500    # Délka přechodu (fade in/out) pro ducking
 FADEOUT_DURATION_MS = 1000    # Finální zeslabení celého klipu
 DUCKING_DB = -18              # O kolik decibelů ztlumit hudbu
 
@@ -48,51 +49,51 @@ def main():
         tts_duration_ms = len(tts_audio)
         print(f"Délka TTS stopy: {tts_duration_ms / 1000:.2f}s.")
 
-        # --- Výpočet potřebné délky hudby ---
-        required_length = INTRO_DURATION_MS + TRANSITION_FADE_MS + tts_duration_ms + TRANSITION_FADE_MS + OUTRO_DURATION_MS
-        
+        # Ujistíme se, že hudba je dostatečně dlouhá
+        required_length = INTRO_STABLE_MS + TRANSITION_FADE_MS + tts_duration_ms + TRANSITION_FADE_MS + OUTRO_STABLE_MS
         if len(background_music) < required_length:
             print("Hudba je příliš krátká, bude započata smyčka.")
             loops = (required_length // len(background_music)) + 1
             background_music = background_music * loops
 
-        # --- Definice časových bodů pro rozřezání hudby ---
-        t1_intro_end = INTRO_DURATION_MS
-        t2_fade_down_end = t1_intro_end + TRANSITION_FADE_MS
-        t3_main_part_end = t2_fade_down_end + tts_duration_ms
-        t4_fade_up_end = t3_main_part_end + TRANSITION_FADE_MS
-        t5_outro_end = t4_fade_up_end + OUTRO_DURATION_MS
+        # --- Definice časových bodů ---
+        t0 = 0
+        t1 = INTRO_STABLE_MS
+        t2 = t1 + TRANSITION_FADE_MS
+        t3 = t2 + tts_duration_ms
+        t4 = t3 + TRANSITION_FADE_MS
+        t5 = t4 + OUTRO_STABLE_MS
 
-        # --- Vytvoření 5 samostatných hudebních segmentů ---
-        print("Vytvářím 5 oddělených hudebních segmentů...")
-
-        # Díl 1: Úvod (plná hlasitost)
-        intro_part = background_music[0:t1_intro_end]
+        # --- Vytvoření jednotlivých segmentů hudby na pozadí ---
+        print("Vytvářím jednotlivé hudební segmenty...")
         
-        # Díl 2: Přechod - Plynulé ztlumení
-        transition_down_part = background_music[t1_intro_end:t2_fade_down_end].fade(to_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
+        # 1. Stabilní Intro (plná hlasitost)
+        intro_part = background_music[t0:t1]
         
-        # Díl 3: Hlavní část (ztlumená)
-        main_quiet_part = background_music[t2_fade_down_end:t3_main_part_end].apply_gain(DUCKING_DB)
+        # 2. Přechod Fade Out
+        transition_out_part = background_music[t1:t2].fade(to_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
         
-        # Díl 4: Přechod - Plynulé zesílení
-        transition_up_part = background_music[t3_main_part_end:t4_fade_up_end].fade(from_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
+        # 3. Hlavní část (ztlumená)
+        main_ducked_part = background_music[t2:t3].apply_gain(DUCKING_DB)
         
-        # Díl 5: Závěr (plná hlasitost)
-        outro_part = background_music[t4_fade_up_end:t5_outro_end]
-
-        # --- Sestavení finálního hudebního podkresu ---
-        print("Skládám finální hudební podkres...")
-        final_background = intro_part + transition_down_part + main_quiet_part + transition_up_part + outro_part
+        # 4. Přechod Fade In
+        transition_in_part = background_music[t3:t4].fade(from_gain=DUCKING_DB, duration=TRANSITION_FADE_MS)
+        
+        # 5. Stabilní Outro (plná hlasitost)
+        outro_part = background_music[t4:t5]
+        
+        # --- Spojení hudebních segmentů do jednoho celku ---
+        print("Spojuji hudební segmenty...")
+        final_background = intro_part + transition_out_part + main_ducked_part + transition_in_part + outro_part
         
         # --- Překrytí řečí na správné místo ---
-        # Řeč začíná po skončení úvodu a po skončení přechodu ztlumení
-        tts_position = INTRO_DURATION_MS + TRANSITION_FADE_MS
-        print(f"Pokládám hlasovou stopu na pozici {tts_position}ms...")
+        # Řeč začíná po stabilním intru a po fade-out přechodu
+        tts_position = INTRO_STABLE_MS + TRANSITION_FADE_MS
+        print(f"Překrývám hudbu řečí na pozici {tts_position}ms...")
         final_mix_unfaded = final_background.overlay(tts_audio, position=tts_position)
         
         # --- Finální úpravy ---
-        print(f"Aplikuji finální fade-out na konci celé stopy...")
+        print(f"Aplikuji finální fade-out ({FADEOUT_DURATION_MS}ms)...")
         final_mix = final_mix_unfaded.fade_out(duration=FADEOUT_DURATION_MS)
 
         # Export finálního souboru
@@ -104,7 +105,7 @@ def main():
         sys.exit(1)
 
     finally:
-        # --- Úklid ---
+        # --- 4. Úklid ---
         if os.path.exists(TTS_TEMP_FILE):
             os.remove(TTS_TEMP_FILE)
             print("Dočasný TTS soubor byl smazán.")
