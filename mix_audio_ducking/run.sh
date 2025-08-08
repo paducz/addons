@@ -4,12 +4,18 @@ bashio::log.info "Audio Mixer Add-on spuštěn."
 
 # --- 1. Načtení a sloučení konfigurace ---
 # Načteme data poslaná přes stdin (z automatizace).
-# Pokud žádná data nepřijdou, bude proměnná prázdná.
 INPUT_OPTIONS=$(</dev/stdin)
 
-# Sloučíme výchozí konfiguraci z /data/options.json s daty z stdin.
-# Data z stdin mají přednost. Používáme `jq` pro inteligentní sloučení JSON objektů.
-CONFIG=$(jq -s '.[0] * .[1]' /data/options.json <(echo "$INPUT_OPTIONS"))
+# Zkontrolujeme, zda přišla nějaká data z automatizace.
+if [[ -z "$INPUT_OPTIONS" ]]; then
+    # Pokud ne (manuální spuštění), použijeme jen základní konfiguraci.
+    bashio::log.info "Nebyla nalezena žádná data na vstupu (stdin). Používám výchozí konfiguraci."
+    CONFIG=$(cat /data/options.json)
+else
+    # Pokud ano, sloučíme výchozí konfiguraci s daty z automatizace.
+    bashio::log.info "Nalezena data na vstupu. Slučuji s výchozí konfigurací."
+    CONFIG=$(jq -s '.[0] * .[1]' /data/options.json <(echo "$INPUT_OPTIONS"))
+fi
 
 # Načteme finální hodnoty z výsledného sloučeného JSONu.
 ELEVENLABS_API_KEY=$(echo "$CONFIG" | jq -r '.elevenlabs_api_key')
@@ -21,20 +27,16 @@ OUTPUT_FILENAME=$(echo "$CONFIG" | jq -r '.output_filename')
 bashio::log.info "Cílový výstupní soubor: /share/${OUTPUT_FILENAME}"
 bashio::log.info "Text k přečtení: '${TEXT_TO_SPEAK}'"
 
-# --- Zbytek skriptu zůstává stejný ---
-
 # --- 2. Definice cest k souborům ---
 MUSIC_PATH="/share/${MUSIC_FILENAME}"
 TTS_PATH="/tmp/tts.mp3"
 OUTPUT_PATH="/share/${OUTPUT_FILENAME}"
-# ... (všechny ostatní cesty)
 INTRO_PATH="/tmp/intro.mp3"
 MAIN_MUSIC_PATH="/tmp/main_music.mp3"
 DUCKED_PART_PATH="/tmp/ducked_part.mp3"
 OUTRO_PATH="/tmp/outro.mp3"
 CONCAT_LIST_PATH="/tmp/concat_list.txt"
 FINAL_UNFADED_PATH="/tmp/final_unfaded.mp3"
-
 
 # --- 3. Validace vstupů ---
 if [[ "$ELEVENLABS_API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
@@ -61,7 +63,7 @@ if [ ! -f "$TTS_PATH" ]; then
     exit 1
 fi
 
-# --- 5. Zpracování zvuku pomocí FFMPEG ---
+# --- 5. Zpracování zvuku pomocí FFMPEG (výstup přesměrován pro čistší log) ---
 TTS_DURATION=$(ffprobe -i "$TTS_PATH" -show_entries format=duration -v quiet -of csv="p=0")
 bashio::log.info "Délka řečové stopy: ${TTS_DURATION}s."
 bashio::log.info "Vytvářím 1s intro..."
