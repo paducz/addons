@@ -8,4 +8,8 @@ ELEVEN_KEY="${ELEVEN_KEY:-}"
 
 mkdir -p "$AUDIO_DIR"
 
-exec python3 /mix.py             --audio-dir "$AUDIO_DIR"             --port "$PORT"             --auth "$AUTH_TOKEN"             --eleven-key "$ELEVEN_KEY"
+exec python3 /mix.py \
+    --audio-dir "$AUDIO_DIR" \
+    --port "$PORT" \
+    --auth "$AUTH_TOKEN" \
+    --eleven-key "$ELEVEN_KEY"
