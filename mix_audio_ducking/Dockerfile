@@ -1,11 +1,7 @@
-# Použijeme speciální proměnnou, kterou Home Assistant Supervisor
-# automaticky nahradí správným a aktuálním základním obrazem.
-#FROM %%BASE_IMAGE%%
+# !! NOUZOVÉ ŘEŠENÍ POUZE PRO aarch64 (Raspberry Pi atd.) !!
 FROM ghcr.io/home-assistant/aarch64-base-debian:bullseye
 
-
 # Aktualizujeme a nainstalujeme potřebné balíčky
-# PŘIDÁNA PODPORA PRO 'bc' (Basic Calculator) pro matematické operace s desetinnými čísly
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
