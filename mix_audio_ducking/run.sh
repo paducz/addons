@@ -3,21 +3,15 @@
 bashio::log.info "Audio Mixer Add-on spuštěn."
 
 # --- 1. Načtení a sloučení konfigurace ---
-# Načteme data poslaná přes stdin (z automatizace).
 INPUT_OPTIONS=$(</dev/stdin)
-
-# Zkontrolujeme, zda přišla nějaká data z automatizace.
 if [[ -z "$INPUT_OPTIONS" ]]; then
-    # Pokud ne (manuální spuštění), použijeme jen základní konfiguraci.
     bashio::log.info "Nebyla nalezena žádná data na vstupu (stdin). Používám výchozí konfiguraci."
     CONFIG=$(cat /data/options.json)
 else
-    # Pokud ano, sloučíme výchozí konfiguraci s daty z automatizace.
     bashio::log.info "Nalezena data na vstupu. Slučuji s výchozí konfigurací."
     CONFIG=$(jq -s '.[0] * .[1]' /data/options.json <(echo "$INPUT_OPTIONS"))
 fi
 
-# Načteme finální hodnoty z výsledného sloučeného JSONu.
 ELEVENLABS_API_KEY=$(echo "$CONFIG" | jq -r '.elevenlabs_api_key')
 VOICE_ID=$(echo "$CONFIG" | jq -r '.voice_id')
 MUSIC_FILENAME=$(echo "$CONFIG" | jq -r '.music_filename')
@@ -29,7 +23,6 @@ bashio::log.info "Hudební soubor: '${MUSIC_FILENAME}'"
 bashio::log.info "Text k přečtení: '${TEXT_TO_SPEAK}'"
 
 # --- 2. Definice cest k souborům ---
-# Použijeme cestu k hudbě přesně tak, jak je zadaná v konfiguraci.
 MUSIC_PATH="${MUSIC_FILENAME}"
 TTS_PATH="/tmp/tts.mp3"
 OUTPUT_PATH="/share/${OUTPUT_FILENAME}"
@@ -45,28 +38,38 @@ if [[ "$ELEVENLABS_API_KEY" == "YOUR_ELEVENLABS_API_KEY" || -z "$ELEVENLABS_API_
     bashio::log.fatal "Prosím, nastavte váš API klíč pro ElevenLabs v konfiguraci doplňku."
     exit 1
 fi
-# Kontrolujeme existenci souboru na zadané absolutní cestě.
 if [ ! -f "$MUSIC_PATH" ]; then
     bashio::log.fatal "Hudební soubor nebyl nalezen na zadané cestě: '${MUSIC_PATH}'. Ujistěte se, že cesta je správná a doplněk má k ní přístup (přes 'map' v config.yaml)."
     exit 1
 fi
 
 # --- 4. Generování TTS stopy ---
+# Zde je klíčová oprava. Používáme novou, správnou syntaxi knihovny elevenlabs.
 bashio::log.info "Generuji řečovou stopu pomocí ElevenLabs..."
 cat << EOF > /tmp/generate_tts.py
-from elevenlabs.client import ElevenLabs
-client = ElevenLabs(api_key="${ELEVENLABS_API_KEY}")
-audio = client.generate(text="${TEXT_TO_SPEAK}", voice="${VOICE_ID}")
-with open("${TTS_PATH}", "wb") as f:
-    f.write(audio)
+from elevenlabs import generate, set_api_key, save
+
+# Nastavení API klíče
+set_api_key("${ELEVENLABS_API_KEY}")
+
+# Vygenerování audio dat
+# Používáme trojité uvozovky pro případ, že text obsahuje speciální znaky
+audio = generate(
+    text="""${TEXT_TO_SPEAK}""",
+    voice="${VOICE_ID}"
+)
+
+# Uložení audia do souboru pomocí vestavěné funkce
+save(audio, "${TTS_PATH}")
 EOF
+
 python3 /tmp/generate_tts.py
 if [ ! -f "$TTS_PATH" ]; then
     bashio::log.fatal "Generování TTS selhalo. Zkontrolujte API klíč, ID hlasu a připojení k internetu."
     exit 1
 fi
 
-# --- 5. Zpracování zvuku pomocí FFMPEG (výstup přesměrován pro čistší log) ---
+# --- 5. Zpracování zvuku pomocí FFMPEG ---
 TTS_DURATION=$(ffprobe -i "$TTS_PATH" -show_entries format=duration -v quiet -of csv="p=0")
 bashio::log.info "Délka řečové stopy: ${TTS_DURATION}s."
 bashio::log.info "Vytvářím 1s intro..."
