@@ -44,6 +44,7 @@ if [ ! -f "$MUSIC_PATH" ]; then
 fi
 
 # --- 4. Generování TTS stopy ---
+# FINÁLNÍ OPRAVA: API vrací proud dat (generátor), který musíme zpracovat ve smyčce.
 bashio::log.info "Generuji řečovou stopu pomocí ElevenLabs..."
 cat << EOF > /tmp/generate_tts.py
 from elevenlabs.client import ElevenLabs
@@ -53,16 +54,18 @@ client = ElevenLabs(
     api_key="${ELEVENLABS_API_KEY}",
 )
 
-# Vygenerování audio dat přes správnou metodu 'text_to_speech.convert'
-audio = client.text_to_speech.convert(
+# Vygenerování proudu audio dat (generátoru)
+audio_stream = client.text_to_speech.convert(
     voice_id="${VOICE_ID}",
     text="""${TEXT_TO_SPEAK}""",
-    model_id="eleven_multilingual_v2" # Přidán doporučený model z dokumentace
+    model_id="eleven_multilingual_v2"
 )
 
-# Ruční uložení audio dat (bytů) do souboru
+# Zápis proudu dat do souboru kousek po kousku
 with open("${TTS_PATH}", "wb") as f:
-    f.write(audio)
+    for chunk in audio_stream:
+        f.write(chunk)
+
 EOF
 
 python3 /tmp/generate_tts.py
