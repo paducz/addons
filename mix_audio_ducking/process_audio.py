@@ -35,10 +35,10 @@ def safe_seg(seg, label):
     return seg
 
 def main() -> None:
-    if len(sys.argv) != 6:
-        die(f"Expected 5 args, got {len(sys.argv) - 1}")
+    if len(sys.argv) != 7:
+        die(f"Expected 6 args, got {len(sys.argv) - 1}")
 
-    api_key, model_id, voice_id, music_path, text_to_speak, output_path = sys.argv[1:6]
+    api_key, model_id, voice_id, music_path, text_to_speak, output_path = sys.argv[1:7]
 
     # --- TTS -----------------------------------------------------------------
     print("⏳  Generating TTS…")
