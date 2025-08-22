@@ -38,7 +38,7 @@ def main() -> None:
     if len(sys.argv) != 6:
         die(f"Expected 5 args, got {len(sys.argv) - 1}")
 
-    api_key, voice_id, music_path, text_to_speak, output_path = sys.argv[1:6]
+    api_key, model_id, voice_id, music_path, text_to_speak, output_path = sys.argv[1:6]
 
     # --- TTS -----------------------------------------------------------------
     print("⏳  Generating TTS…")
@@ -47,7 +47,7 @@ def main() -> None:
         stream = client.text_to_speech.convert(
             voice_id=voice_id,
             text=text_to_speak,
-            model_id="eleven_multilingual_v2",
+            model_id=model_id,
         )
         with open(TTS_TEMP_FILE, "wb") as f:
             for chunk in stream:

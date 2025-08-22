@@ -45,6 +45,7 @@ while true; do
         
         # --- Extract final values from the merged JSON ---
         API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
+        MODEL_ID=$(echo "$FINAL_CONFIG" | jq -r '.model_id // ""')
         VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
         MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
         TEXT_TO_SPEAK=$(echo "$FINAL_CONFIG" | jq -r '.text_to_speak // ""')
@@ -53,6 +54,8 @@ while true; do
         # --- Validate mandatory parameters ---
         if [ -z "$API_KEY" ] || [[ "$API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
              echo "Error: Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
+        elif [ -z "$MODEL_ID" ]; then
+            echo "Error: Mandatory parameter 'model_id' was not provided in the request. Aborting job."
         elif [ -z "$TEXT_TO_SPEAK" ]; then
             echo "Error: Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
         elif [ -z "$OUTPUT_FILENAME" ]; then
@@ -64,6 +67,7 @@ while true; do
             # --- Call the Python script with the final, validated data ---
             /process_audio.py \
                 "$API_KEY" \
+                "$MODEL_ID" \
                 "$VOICE_ID" \
                 "$MUSIC_FILENAME" \
                 "$TEXT_TO_SPEAK" \

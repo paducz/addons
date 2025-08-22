@@ -1,7 +1,7 @@
 # config.yaml
 name: "Audio Mixer Bash Service"
 description: "A service that generates audio by listening for jobs on stdin, orchestrated by Bash."
-version: "6.0.0" # Final architecture
+version: "7.0.0" # Final architecture
 slug: "mix_audio_ducking"
 arch:
   - aarch64
@@ -19,6 +19,7 @@ map:
 # Options here act as DEFAULTS. They can be overridden by the HA script.
 options:
   elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
+  model_id: "eleven_v3"
   voice_id: "21m00Tcm4TlvDq8ikWAM"
   music_filename: "/media/sounds/ambient_story_1.mp3"
   text_to_speak: "This is a test run of the new Pydub-based add-on."
@@ -26,6 +27,7 @@ options:
 
 schema:
   elevenlabs_api_key: "str"
+  model_id: "str"
   voice_id: "str"
   music_filename: "str"
   text_to_speak: "str"
