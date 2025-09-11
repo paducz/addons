@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# = This script runs as a persistent service, listening for jobs on stdin.    =
-# = It reads defaults from /data/options.json and merges them with stdin.    =
+# = This script runs as a persistent service, listening for jobs on stdin.     =
+# = It reads defaults from /data/options.json and merges them with stdin.      =
 # = THIS VERSION DOES NOT USE BASHIO AND IS THE CORRECT SERVICE PATTERN.       =
 # ==============================================================================
 
@@ -31,39 +31,39 @@ while true; do
             DEFAULT_CONFIG="{}"
         fi
 
-        # Step 2: Read the configuration from stdin.
-        # Default to an empty JSON object '{}' if the stdin is not valid JSON.
-        if echo "$line" | jq -e . >/dev/null; then
+        # Step 2: Validate stdin JSON and set it as config.
+        if echo "$line" | jq -e . >/dev/null 2>&1; then
             STDIN_CONFIG="$line"
         else
             echo "Error: Received invalid JSON on stdin. Ignoring request."
             STDIN_CONFIG="{}"
         fi
 
-        # Step 3: Merge the two. The stdin data (`.[1]`) will overwrite the defaults (`.[0]`).
+        # Step 3: Merge the two JSON objects.
+        # The stdin data (`.[1]`) overwrites defaults (`.[0]`).
         FINAL_CONFIG=$(jq -s '.[0] * .[1]' <(echo "$DEFAULT_CONFIG") <(echo "$STDIN_CONFIG"))
         
         # --- Extract final values from the merged JSON ---
         API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
         MODEL_ID=$(echo "$FINAL_CONFIG" | jq -r '.model_id // ""')
         VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
-        INTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.intro_full_ms // ""')
-        OUTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.outro_full_ms // ""')
+        INTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.intro_full_ms // 0')
+        OUTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.outro_full_ms // 0')
         MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
         TEXT_TO_SPEAK=$(echo "$FINAL_CONFIG" | jq -r '.text_to_speak // ""')
         OUTPUT_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.output_filename // ""')
 
         # --- Validate mandatory parameters ---
         if [ -z "$API_KEY" ] || [[ "$API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
-             echo "Error: Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
+            echo "Error: Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
         elif [ -z "$MODEL_ID" ]; then
             echo "Error: Mandatory parameter 'model_id' was not provided in the request. Aborting job."
         elif [ -z "$VOICE_ID" ]; then
             echo "Error: Mandatory parameter 'voice_id' was not provided in the request. Aborting job."
-        elif [ -z "$INTRO_FULL_MS" ]; then
-            echo "Error: Mandatory parameter 'intro_full_ms' was not provided in the request. Aborting job."
-        elif [ -z "$OUTRO_FULL_MS" ]; then
-            echo "Error: Mandatory parameter 'outro_full_ms' was not provided in the request Aborting job."
+        elif ! [[ "$INTRO_FULL_MS" =~ ^[0-9]+$ ]]; then
+            echo "Error: intro_full_ms must be a valid number. Aborting job."
+        elif ! [[ "$OUTRO_FULL_MS" =~ ^[0-9]+$ ]]; then
+            echo "Error: outro_full_ms must be a valid number. Aborting job."
         elif [ -z "$TEXT_TO_SPEAK" ]; then
             echo "Error: Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
         elif [ -z "$OUTPUT_FILENAME" ]; then
@@ -72,6 +72,10 @@ while true; do
             echo "Job is valid. Starting Python audio processor..."
             echo "  - Voice: $VOICE_ID"
             echo "  - Music: $MUSIC_FILENAME"
+            echo "  - Intro Fade Duration: ${INTRO_FULL_MS}ms"
+            echo "  - Outro Fade Duration: ${OUTRO_FULL_MS}ms"
+            echo "  - Output File: $OUTPUT_FILENAME"
+
             # --- Call the Python script with the final, validated data ---
             /process_audio.py \
                 "$API_KEY" \
@@ -88,5 +92,6 @@ while true; do
         echo "Waiting for next job..."
     fi
     
+    # Small delay to prevent tight looping
     sleep 1
 done

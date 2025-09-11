@@ -3,12 +3,12 @@
 Process: music + TTS
 
 Timeline:
-1) 4 s music full
+1) intro_full_ms of music at full volume
 2) fade-out to −18 dB (TTS starts at the *middle* of this fade)
 3) ducked bed under TTS
 4) fade-in back to full (TTS ends at the *middle* of this fade)
-5) 3 s music full
-6) final 1 s fade-out (whole mix)
+5) outro_full_ms of music at full volume
+6) final fade-out of whole mix
 """
 
 import os
@@ -17,28 +17,37 @@ from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
 # === CONFIG =================================================================
-DUCK_FADE_MS    =  1200      # nominal fade length; may shrink if TTS is very short
-DUCK_LEVEL_DB   =  -19       # duck amount during TTS
-FINAL_FADE_MS   = 2_000      # final fade-out of whole mix
+DUCK_FADE_MS    = 1200       # nominal fade length; may shrink if TTS is very short
+DUCK_LEVEL_DB   = -19        # duck amount during TTS
+FINAL_FADE_MS   = 2000       # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
 
 def die(msg: str) -> None:
+    """Print error and exit."""
     print(f"❌  {msg}")
     sys.exit(1)
 
 def safe_seg(seg, label):
-    if seg is None:
-        die(f"Segment '{label}' is None (bad slice)")
+    """Ensure the segment is not empty."""
+    if len(seg) <= 0:
+        die(f"Segment '{label}' is empty (bad slice)")
     return seg
 
 def main() -> None:
+    # --- Validate arguments ---
     if len(sys.argv) != 9:
         die(f"Expected 8 args, got {len(sys.argv) - 1}")
 
     api_key, model_id, voice_id, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:9]
 
-    # --- TTS -----------------------------------------------------------------
+    try:
+        intro_full_ms = int(intro_full_ms)
+        outro_full_ms = int(outro_full_ms)
+    except ValueError:
+        die("intro_full_ms and outro_full_ms must be integers")
+
+    # --- Generate TTS --------------------------------------------------------
     print("⏳  Generating TTS…")
     try:
         client = ElevenLabs(api_key=api_key)
@@ -50,8 +59,10 @@ def main() -> None:
         with open(TTS_TEMP_FILE, "wb") as f:
             for chunk in stream:
                 f.write(chunk)
+
         if not os.path.getsize(TTS_TEMP_FILE):
             die("Generated TTS file is empty.")
+
         tts_audio = AudioSegment.from_mp3(TTS_TEMP_FILE)
     except Exception as e:
         die(f"TTS failed: {e}")
@@ -59,20 +70,20 @@ def main() -> None:
     tts_len = len(tts_audio)
     if tts_len <= 0:
         die("TTS audio has zero length.")
-    print(f"   ✔️  TTS length: {tts_len/1000:.2f} s")
 
-    # Use an effective fade that guarantees: start/end happen at fade middles
+    print(f"   ✔️  TTS length: {tts_len / 1000:.2f} s")
+
+    # Effective fade ensures TTS starts/ends at fade middles
     eff_fade_ms = min(DUCK_FADE_MS, tts_len)
 
-    # --- Music ---------------------------------------------------------------
+    # --- Load music ----------------------------------------------------------
     try:
         music = AudioSegment.from_mp3(music_path)
     except Exception as e:
         die(f"Cannot load music '{music_path}': {e}")
 
-    # Required total bed length:
-    # intro + (fade-out + duck + fade-in) + outro
-    duck_main_len = max(tts_len - eff_fade_ms, 0)  # TTS spans half-fade + duck + half-fade
+    # Calculate required total bed length
+    duck_main_len = max(tts_len - eff_fade_ms, 0)  # core ducked section
     need_ms = intro_full_ms + eff_fade_ms + duck_main_len + eff_fade_ms + outro_full_ms
 
     if len(music) < need_ms:
@@ -80,7 +91,7 @@ def main() -> None:
         music *= loops
         print(f"   ℹ️  Music too short → looped ×{loops}")
 
-    # --- Segment the bed -----------------------------------------------------
+    # --- Build the segments --------------------------------------------------
     i = 0
     intro_full = safe_seg(music[i : i + intro_full_ms], "intro_full")
     i += intro_full_ms
@@ -97,10 +108,9 @@ def main() -> None:
     )
     i += eff_fade_ms
 
-    # Ducked main (under the body of TTS)
     duck_main = safe_seg(
         music[i : i + duck_main_len].apply_gain(DUCK_LEVEL_DB),
-        "duck_main",
+        "duck_main"
     )
     i += duck_main_len
 
@@ -119,15 +129,15 @@ def main() -> None:
     outro_full = safe_seg(music[i : i + outro_full_ms], "outro_full")
     i += outro_full_ms
 
-    # Assemble the bed
+    # Assemble the background music bed
     bed = intro_full + fade_out + duck_main + fade_in + outro_full
 
     # --- Overlay TTS ---------------------------------------------------------
-    # TTS starts at the middle of fade-out, ends at the middle of fade-in
+    # TTS starts at the middle of fade-out and ends at middle of fade-in
     tts_start = intro_full_ms + (eff_fade_ms // 2)
     mix = bed.overlay(tts_audio, position=tts_start)
 
-    # --- Final fade & export -------------------------------------------------
+    # --- Final fade-out and export -------------------------------------------
     final = mix.fade_out(FINAL_FADE_MS)
     final.export(output_path, format="mp3")
     print(f"✅  Done → {output_path}")
