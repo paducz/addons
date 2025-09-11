@@ -33,8 +33,8 @@ def safe_seg(seg, label):
     return seg
 
 def main() -> None:
-    if len(sys.argv) != 7:
-        die(f"Expected 6 args, got {len(sys.argv) - 1}")
+    if len(sys.argv) != 9:
+        die(f"Expected 8 args, got {len(sys.argv) - 1}")
 
     api_key, model_id, voice_id, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:9]
 
