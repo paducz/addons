@@ -17,10 +17,8 @@ from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
 # === CONFIG =================================================================
-INTRO_FULL_MS   = 5_000      # 4 s full intro
 DUCK_FADE_MS    =  1200      # nominal fade length; may shrink if TTS is very short
 DUCK_LEVEL_DB   =  -19       # duck amount during TTS
-OUTRO_FULL_MS   = 5_000      # 3 s full at the end
 FINAL_FADE_MS   = 2_000      # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
@@ -38,7 +36,7 @@ def main() -> None:
     if len(sys.argv) != 7:
         die(f"Expected 6 args, got {len(sys.argv) - 1}")
 
-    api_key, model_id, voice_id, music_path, text_to_speak, output_path = sys.argv[1:7]
+    api_key, model_id, voice_id, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:9]
 
     # --- TTS -----------------------------------------------------------------
     print("⏳  Generating TTS…")
@@ -75,7 +73,7 @@ def main() -> None:
     # Required total bed length:
     # intro + (fade-out + duck + fade-in) + outro
     duck_main_len = max(tts_len - eff_fade_ms, 0)  # TTS spans half-fade + duck + half-fade
-    need_ms = INTRO_FULL_MS + eff_fade_ms + duck_main_len + eff_fade_ms + OUTRO_FULL_MS
+    need_ms = intro_full_ms + eff_fade_ms + duck_main_len + eff_fade_ms + outro_full_ms
 
     if len(music) < need_ms:
         loops = -(-need_ms // len(music))  # ceil division
@@ -84,8 +82,8 @@ def main() -> None:
 
     # --- Segment the bed -----------------------------------------------------
     i = 0
-    intro_full = safe_seg(music[i : i + INTRO_FULL_MS], "intro_full")
-    i += INTRO_FULL_MS
+    intro_full = safe_seg(music[i : i + intro_full_ms], "intro_full")
+    i += intro_full_ms
 
     # Fade-out: full → duck (TTS will start at the *middle* of this segment)
     fade_out = safe_seg(
@@ -118,15 +116,15 @@ def main() -> None:
     )
     i += eff_fade_ms
 
-    outro_full = safe_seg(music[i : i + OUTRO_FULL_MS], "outro_full")
-    i += OUTRO_FULL_MS
+    outro_full = safe_seg(music[i : i + outro_full_ms], "outro_full")
+    i += outro_full_ms
 
     # Assemble the bed
     bed = intro_full + fade_out + duck_main + fade_in + outro_full
 
     # --- Overlay TTS ---------------------------------------------------------
     # TTS starts at the middle of fade-out, ends at the middle of fade-in
-    tts_start = INTRO_FULL_MS + (eff_fade_ms // 2)
+    tts_start = intro_full_ms + (eff_fade_ms // 2)
     mix = bed.overlay(tts_audio, position=tts_start)
 
     # --- Final fade & export -------------------------------------------------

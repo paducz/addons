@@ -47,6 +47,8 @@ while true; do
         API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
         MODEL_ID=$(echo "$FINAL_CONFIG" | jq -r '.model_id // ""')
         VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
+        INTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.intro_full_ms // ""')
+        OUTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.outro_full_ms // ""')
         MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
         TEXT_TO_SPEAK=$(echo "$FINAL_CONFIG" | jq -r '.text_to_speak // ""')
         OUTPUT_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.output_filename // ""')
@@ -56,6 +58,12 @@ while true; do
              echo "Error: Mandatory parameter 'elevenlabs_api_key' is not set in the add-on configuration. Aborting job."
         elif [ -z "$MODEL_ID" ]; then
             echo "Error: Mandatory parameter 'model_id' was not provided in the request. Aborting job."
+        elif [ -z "$VOICE_ID" ]; then
+            echo "Error: Mandatory parameter 'voice_id' was not provided in the request. Aborting job."
+        elif [ -z "$INTRO_FULL_MS" ]; then
+            echo "Error: Mandatory parameter 'intro_full_ms' was not provided in the request. Aborting job."
+        elif [ -z "$OUTRO_FULL_MS" ]; then
+            echo "Error: Mandatory parameter 'outro_full_ms' was not provided in the request Aborting job."
         elif [ -z "$TEXT_TO_SPEAK" ]; then
             echo "Error: Mandatory parameter 'text_to_speak' was not provided in the request. Aborting job."
         elif [ -z "$OUTPUT_FILENAME" ]; then
@@ -69,6 +77,8 @@ while true; do
                 "$API_KEY" \
                 "$MODEL_ID" \
                 "$VOICE_ID" \
+                "$INTRO_FULL_MS" \
+                "$OUTRO_FULL_MS" \
                 "$MUSIC_FILENAME" \
                 "$TEXT_TO_SPEAK" \
                 "$OUTPUT_FILENAME"
