@@ -74,7 +74,7 @@ def main() -> None:
     print(f"   ✔️  TTS length: {tts_len / 1000:.2f} s")
 
     # Effective fade ensures TTS starts/ends at fade middles
-    eff_fade_ms = min(duck_level_db, tts_len)
+    eff_fade_ms = min(DUCK_FADE_MS, tts_len)
 
     # --- Load music ----------------------------------------------------------
     try:
