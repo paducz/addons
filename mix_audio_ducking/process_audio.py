@@ -18,7 +18,6 @@ from elevenlabs.client import ElevenLabs
 
 # === CONFIG =================================================================
 DUCK_FADE_MS    = 1200       # nominal fade length; may shrink if TTS is very short
-DUCK_LEVEL_DB   = -19        # duck amount during TTS
 FINAL_FADE_MS   = 2000       # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
 # ============================================================================
@@ -36,16 +35,17 @@ def safe_seg(seg, label):
 
 def main() -> None:
     # --- Validate arguments ---
-    if len(sys.argv) != 9:
-        die(f"Expected 8 args, got {len(sys.argv) - 1}")
+    if len(sys.argv) != 10:
+        die(f"Expected 9 args, got {len(sys.argv) - 1}")
 
-    api_key, model_id, voice_id, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:9]
+    api_key, model_id, voice_id, duck_level_db, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:10]
 
     try:
+        duck_level_db = int(duck_level_db)
         intro_full_ms = int(intro_full_ms)
         outro_full_ms = int(outro_full_ms)
     except ValueError:
-        die("intro_full_ms and outro_full_ms must be integers")
+        die("duck_level_db, intro_full_ms and outro_full_ms must be integers")
 
     # --- Generate TTS --------------------------------------------------------
     print("⏳  Generating TTS…")
@@ -74,7 +74,7 @@ def main() -> None:
     print(f"   ✔️  TTS length: {tts_len / 1000:.2f} s")
 
     # Effective fade ensures TTS starts/ends at fade middles
-    eff_fade_ms = min(DUCK_FADE_MS, tts_len)
+    eff_fade_ms = min(duck_level_db, tts_len)
 
     # --- Load music ----------------------------------------------------------
     try:
@@ -100,7 +100,7 @@ def main() -> None:
     fade_out = safe_seg(
         music[i : i + eff_fade_ms].fade(
             from_gain=0,
-            to_gain=DUCK_LEVEL_DB,
+            to_gain=duck_level_db,
             start=0,                # important: avoid None + int in pydub
             duration=eff_fade_ms,
         ),
@@ -109,7 +109,7 @@ def main() -> None:
     i += eff_fade_ms
 
     duck_main = safe_seg(
-        music[i : i + duck_main_len].apply_gain(DUCK_LEVEL_DB),
+        music[i : i + duck_main_len].apply_gain(duck_level_db),
         "duck_main"
     )
     i += duck_main_len
@@ -117,7 +117,7 @@ def main() -> None:
     # Fade-in: duck → full (TTS will end at the *middle* of this segment)
     fade_in = safe_seg(
         music[i : i + eff_fade_ms].fade(
-            from_gain=DUCK_LEVEL_DB,
+            from_gain=duck_level_db,
             to_gain=0,
             start=0,                # important
             duration=eff_fade_ms,

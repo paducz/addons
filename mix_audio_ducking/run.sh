@@ -47,6 +47,7 @@ while true; do
         API_KEY=$(echo "$FINAL_CONFIG" | jq -r '.elevenlabs_api_key // ""')
         MODEL_ID=$(echo "$FINAL_CONFIG" | jq -r '.model_id // ""')
         VOICE_ID=$(echo "$FINAL_CONFIG" | jq -r '.voice_id // ""')
+        DUCK_LEVEL_DB=$(echo "$FINAL_CONFIG" | jq -r '.duck_level_db // 0')
         INTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.intro_full_ms // 0')
         OUTRO_FULL_MS=$(echo "$FINAL_CONFIG" | jq -r '.outro_full_ms // 0')
         MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
@@ -60,6 +61,8 @@ while true; do
             echo "Error: Mandatory parameter 'model_id' was not provided in the request. Aborting job."
         elif [ -z "$VOICE_ID" ]; then
             echo "Error: Mandatory parameter 'voice_id' was not provided in the request. Aborting job."
+        elif ! [[ "$DUCK_LEVEL_DB" =~ ^-?[0-9]+$ ]]; then
+            echo "Error: duck_level_db must be a valid number. Aborting job."
         elif ! [[ "$INTRO_FULL_MS" =~ ^[0-9]+$ ]]; then
             echo "Error: intro_full_ms must be a valid number. Aborting job."
         elif ! [[ "$OUTRO_FULL_MS" =~ ^[0-9]+$ ]]; then
@@ -72,6 +75,7 @@ while true; do
             echo "Job is valid. Starting Python audio processor..."
             echo "  - Voice: $VOICE_ID"
             echo "  - Music: $MUSIC_FILENAME"
+            echo "  - Duck Level: ${DUCK_LEVEL_DB}dB"
             echo "  - Intro Fade Duration: ${INTRO_FULL_MS}ms"
             echo "  - Outro Fade Duration: ${OUTRO_FULL_MS}ms"
             echo "  - Output File: $OUTPUT_FILENAME"
@@ -81,6 +85,7 @@ while true; do
                 "$API_KEY" \
                 "$MODEL_ID" \
                 "$VOICE_ID" \
+                "$DUCK_LEVEL_DB" \
                 "$INTRO_FULL_MS" \
                 "$OUTRO_FULL_MS" \
                 "$MUSIC_FILENAME" \

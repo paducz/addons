@@ -21,6 +21,7 @@ options:
   elevenlabs_api_key: "YOUR_ELEVENLABS_API_KEY"
   model_id: "eleven_v3"
   voice_id: "21m00Tcm4TlvDq8ikWAM"
+  duck_level_db: -19
   intro_full_ms: 5000
   outro_full_ms: 5000
   music_filename: "/media/sounds/ambient_story_1.mp3"
@@ -31,6 +32,7 @@ schema:
   elevenlabs_api_key: "str"
   model_id: "str"
   voice_id: "str"
+  duck_level_db: "int"
   intro_full_ms: "int"
   outro_full_ms: "int"
   music_filename: "str"
