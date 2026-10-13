@@ -2,6 +2,10 @@
 """
 Process: music + TTS
 
+Without music (music_filename empty) only the TTS is exported.
+Optional audio_effects (JSON, e.g. {"filter_preset_id": "old_radio"}) are applied
+by ElevenLabs during TTS generation.
+
 Timeline:
 1) intro_full_ms of music at full volume
 2) fade-out to −18 dB (TTS starts at the *middle* of this fade)
@@ -11,8 +15,11 @@ Timeline:
 6) final fade-out of whole mix
 """
 
+import json
 import os
 import sys
+import urllib.error
+import urllib.request
 from pydub import AudioSegment
 from elevenlabs.client import ElevenLabs
 
@@ -20,6 +27,7 @@ from elevenlabs.client import ElevenLabs
 DUCK_FADE_MS    = 1200       # nominal fade length; may shrink if TTS is very short
 FINAL_FADE_MS   = 2000       # final fade-out of whole mix
 TTS_TEMP_FILE   = "/tmp/tts.mp3"
+TTS_API_URL     = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 # ============================================================================
 
 def die(msg: str) -> None:
@@ -33,10 +41,29 @@ def safe_seg(seg, label):
         die(f"Segment '{label}' is empty (bad slice)")
     return seg
 
+def tts_with_effects(api_key, voice_id, model_id, text, audio_effects) -> None:
+    """TTS via REST API — audio_effects are not supported by older SDK versions."""
+    body = json.dumps({
+        "text": text,
+        "model_id": model_id,
+        "audio_effects": audio_effects,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        TTS_API_URL.format(voice_id=voice_id) + "?output_format=mp3_44100_128",
+        data=body,
+        headers={"xi-api-key": api_key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp, open(TTS_TEMP_FILE, "wb") as f:
+            f.write(resp.read())
+    except urllib.error.HTTPError as e:
+        die(f"TTS failed: HTTP {e.code}: {e.read().decode('utf-8', 'replace')}")
+
 def main() -> None:
     # --- Validate arguments ---
-    if len(sys.argv) != 10:
-        die(f"Expected 9 args, got {len(sys.argv) - 1}")
+    if len(sys.argv) not in (10, 11):
+        die(f"Expected 9 or 10 args, got {len(sys.argv) - 1}")
 
     api_key, model_id, voice_id, duck_level_db, intro_full_ms, outro_full_ms, music_path, text_to_speak, output_path = sys.argv[1:10]
 
@@ -47,18 +74,29 @@ def main() -> None:
     except ValueError:
         die("duck_level_db, intro_full_ms and outro_full_ms must be integers")
 
+    try:
+        audio_effects = json.loads(sys.argv[10]) if len(sys.argv) == 11 else {}
+    except ValueError:
+        die("audio_effects must be a JSON object")
+    if not isinstance(audio_effects, dict):
+        die("audio_effects must be a JSON object")
+
     # --- Generate TTS --------------------------------------------------------
     print("⏳  Generating TTS…")
     try:
-        client = ElevenLabs(api_key=api_key)
-        stream = client.text_to_speech.convert(
-            voice_id=voice_id,
-            text=text_to_speak,
-            model_id=model_id,
-        )
-        with open(TTS_TEMP_FILE, "wb") as f:
-            for chunk in stream:
-                f.write(chunk)
+        if audio_effects:
+            print(f"   ℹ️  Audio effects: {audio_effects}")
+            tts_with_effects(api_key, voice_id, model_id, text_to_speak, audio_effects)
+        else:
+            client = ElevenLabs(api_key=api_key)
+            stream = client.text_to_speech.convert(
+                voice_id=voice_id,
+                text=text_to_speak,
+                model_id=model_id,
+            )
+            with open(TTS_TEMP_FILE, "wb") as f:
+                for chunk in stream:
+                    f.write(chunk)
 
         if not os.path.getsize(TTS_TEMP_FILE):
             die("Generated TTS file is empty.")
@@ -72,6 +110,13 @@ def main() -> None:
         die("TTS audio has zero length.")
 
     print(f"   ✔️  TTS length: {tts_len / 1000:.2f} s")
+
+    # --- Without music: export the TTS only ---------------------------------
+    if not music_path:
+        tts_audio.export(output_path, format="mp3")
+        print(f"✅  Done (no music) → {output_path}")
+        os.remove(TTS_TEMP_FILE)
+        return
 
     # Effective fade ensures TTS starts/ends at fade middles
     eff_fade_ms = min(DUCK_FADE_MS, tts_len)

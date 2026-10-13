@@ -38,6 +38,13 @@ Po instalaci přejděte na kartu **Konfigurace**. Zde zadané hodnoty slouží j
 | `text_to_speak`     | Výchozí text, který se převede na řeč, pokud není specifikován v automatizaci.                     |
 | `output_filename`   | Výchozí název výstupního souboru, který se uloží do složky `/share`.                               |
 
+Jen v požadavku přes `hassio.addon_stdin` (ne v konfiguraci):
+
+| Volba               | Popis                                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `music_filename: ""`| Bez hudby — vygeneruje se jen řeč (intro/outro/duck se ignorují).                                  |
+| `audio_effects`     | Efekty ElevenLabs aplikované při generování řeči, např. `{"filter_preset_id": "old_radio"}`. Platná ID vrací `GET /v1/audio-effects/catalog`. |
+
 ## Použití v automatizacích
 
 Síla tohoto doplňku spočívá v jeho spouštění z automatizací pomocí služby `hassio.addon_stdin`. Tímto způsobem můžete dynamicky měnit, co se má říct a jak se má výstupní soubor jmenovat.

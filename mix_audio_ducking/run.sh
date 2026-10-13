@@ -53,6 +53,8 @@ while true; do
         MUSIC_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.music_filename // ""')
         TEXT_TO_SPEAK=$(echo "$FINAL_CONFIG" | jq -r '.text_to_speak // ""')
         OUTPUT_FILENAME=$(echo "$FINAL_CONFIG" | jq -r '.output_filename // ""')
+        # Optional ElevenLabs post-processing, e.g. {"filter_preset_id": "old_radio"}
+        AUDIO_EFFECTS=$(echo "$FINAL_CONFIG" | jq -c '.audio_effects // {}')
 
         # --- Validate mandatory parameters ---
         if [ -z "$API_KEY" ] || [[ "$API_KEY" == "YOUR_ELEVENLABS_API_KEY" ]]; then
@@ -79,6 +81,7 @@ while true; do
             echo "  - Intro Fade Duration: ${INTRO_FULL_MS}ms"
             echo "  - Outro Fade Duration: ${OUTRO_FULL_MS}ms"
             echo "  - Output File: $OUTPUT_FILENAME"
+            echo "  - Audio Effects: $AUDIO_EFFECTS"
 
             # --- Call the Python script with the final, validated data ---
             /process_audio.py \
@@ -90,7 +93,8 @@ while true; do
                 "$OUTRO_FULL_MS" \
                 "$MUSIC_FILENAME" \
                 "$TEXT_TO_SPEAK" \
-                "$OUTPUT_FILENAME"
+                "$OUTPUT_FILENAME" \
+                "$AUDIO_EFFECTS"
         fi
         
         echo "=============== JOB-HANDLING FINISHED ==============="

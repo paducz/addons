@@ -1,7 +1,7 @@
 # config.yaml
 name: "Audio Mixer Bash Service"
 description: "A service that generates audio by listening for jobs on stdin, orchestrated by Bash."
-version: "7.0.0" # Final architecture
+version: "7.1.0" # audio_effects, TTS without music
 slug: "mix_audio_ducking"
 arch:
   - aarch64
