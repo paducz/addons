@@ -1,5 +1,6 @@
 # !! NOUZOVÉ ŘEŠENÍ POUZE PRO aarch64 (Raspberry Pi atd.) !!
-FROM ghcr.io/home-assistant/aarch64-base-debian:bullseye
+# bookworm: bullseye je mimo běžnou podporu a jeho balíčky z debian-security mizí (404)
+FROM ghcr.io/home-assistant/aarch64-base-debian:bookworm
 
 # Aktualizujeme a nainstalujeme potřebné balíčky.
 # ffmpeg je stále potřeba, protože pydub ho používá na pozadí.
@@ -12,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Nainstalujeme potřebné Python knihovny
-RUN pip3 install elevenlabs pydub
+# (bookworm chrání systémový Python podle PEP 668 — kontejner je jednoúčelový)
+RUN pip3 install --no-cache-dir --break-system-packages elevenlabs pydub
 
 # Zkopírujeme OBA skripty do kontejneru a nastavíme jim práva pro spuštění
 COPY run.sh /
